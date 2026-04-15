@@ -1,0 +1,14 @@
+# Flutter
+frontend/.dart_tool/
+frontend/build/
+
+# Python
+backend/.venv/
+backend/__pycache__/
+backend/.env
+
+# VSCode
+.vscode/
+
+# macOS
+.DS_Store
