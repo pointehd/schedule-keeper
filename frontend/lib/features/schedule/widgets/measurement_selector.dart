@@ -4,9 +4,20 @@ import '../measurement_type.dart';
 import '../models/measurement_config.dart';
 
 class MeasurementSelector extends StatefulWidget {
-  const MeasurementSelector({super.key, this.onChanged});
+  const MeasurementSelector({
+    super.key,
+    this.onChanged,
+    this.initialType,
+    this.initialPeriodLabel,
+    this.initialValue,
+    this.initialDeadline,
+  });
 
   final ValueChanged<MeasurementConfig?>? onChanged;
+  final MeasurementType? initialType;
+  final String? initialPeriodLabel; // 저장된 period 문자열 ('하루', '일주일', '한달')
+  final int? initialValue;
+  final DateTime? initialDeadline;
 
   @override
   State<MeasurementSelector> createState() => _MeasurementSelectorState();
@@ -22,6 +33,23 @@ class _MeasurementSelectorState extends State<MeasurementSelector> {
   @override
   void initState() {
     super.initState();
+    // 수정 모드 초기값 세팅
+    _selectedType = widget.initialType;
+    if (widget.initialType == MeasurementType.time) {
+      _selectedTimePeriod = TimePeriod.values.firstWhere(
+        (p) => p.label == widget.initialPeriodLabel,
+        orElse: () => TimePeriod.daily,
+      );
+    } else if (widget.initialType == MeasurementType.count) {
+      _selectedCountPeriod = CountPeriod.values.firstWhere(
+        (p) => p.label == widget.initialPeriodLabel,
+        orElse: () => CountPeriod.daily,
+      );
+    }
+    _deadline = widget.initialDeadline;
+    if (widget.initialValue != null) {
+      _valueController.text = widget.initialValue.toString();
+    }
     _valueController.addListener(_notify);
   }
 
@@ -322,7 +350,7 @@ class _DateButton extends StatelessWidget {
         final picked = await showDatePicker(
           context: context,
           initialDate: deadline ?? DateTime.now(),
-          firstDate: DateTime.now(),
+          firstDate: DateTime(DateTime.now().year - 10),
           lastDate: DateTime.now().add(const Duration(days: 365 * 3)),
         );
         if (picked != null) onPicked(picked);

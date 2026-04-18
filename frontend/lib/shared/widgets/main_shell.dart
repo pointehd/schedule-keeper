@@ -9,10 +9,10 @@ class MainShell extends StatefulWidget {
   const MainShell({super.key});
 
   @override
-  State<MainShell> createState() => _MainShellState();
+  State<MainShell> createState() => MainShellState();
 }
 
-class _MainShellState extends State<MainShell> {
+class MainShellState extends State<MainShell> {
   int _currentIndex = 0;
 
   static const List<Widget> _pages = [
@@ -22,6 +22,8 @@ class _MainShellState extends State<MainShell> {
     RoutinePage(),
     MyPage(),
   ];
+
+  void switchTab(int index) => setState(() => _currentIndex = index);
 
   @override
   Widget build(BuildContext context) {
@@ -40,7 +42,7 @@ class _MainShellState extends State<MainShell> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: ''),
           BottomNavigationBarItem(icon: Icon(Icons.flag), label: ''),
           BottomNavigationBarItem(icon: Icon(Icons.add_circle_outline), label: ''),
-          BottomNavigationBarItem(icon: Icon(Icons.checklist), label: ''),
+          BottomNavigationBarItem(icon: Icon(Icons.calendar_month_outlined), label: ''),
           BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: ''),
         ],
       ),

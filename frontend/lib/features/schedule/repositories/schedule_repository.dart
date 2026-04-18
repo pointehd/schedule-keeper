@@ -27,6 +27,18 @@ class ScheduleRepository {
         .toList();
   }
 
+  Future<void> update(ScheduleEntry entry) async {
+    final prefs = await SharedPreferences.getInstance();
+    final entries = await getAll();
+    final index = entries.indexWhere((e) => e.id == entry.id);
+    if (index == -1) return;
+    entries[index] = entry;
+    await prefs.setString(
+      _storageKey,
+      jsonEncode(entries.map((e) => e.toJson()).toList()),
+    );
+  }
+
   Future<void> delete(String id) async {
     final prefs = await SharedPreferences.getInstance();
     final entries = await getAll();
