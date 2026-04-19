@@ -6,23 +6,24 @@ Flutter (Dart `^3.11.4`) 기반 프론트엔드.
 
 ```
 lib/
-├── main.dart               # 앱 진입점. runApp()과 앱 시작 시 1회성 초기화만 둔다.
-│
-├── app/                    # MaterialApp 설정 (테마, 라우팅)
-│
-├── core/                   # UI 없는 인프라 코드
-│   └── api/                # HTTP 클라이언트(Dio), 서비스 클래스
-│
-├── features/               # 화면/도메인 단위 모듈
-│   ├── auth/               # 로그인, 게스트 상태 관련
-│   ├── goals/              # 목표 관리
-│   ├── home/               # 홈 화면
-│   ├── routine/            # 데일리 루틴
-│   └── tracking/           # 여유시간 트래킹
-│
-└── shared/                 # 2개 이상의 feature에서 재사용하는 위젯/유틸
-    └── widgets/            # 공통 위젯 (AppScaffold 등)
+├── main.dart       # 앱 진입점
+├── app/            # MaterialApp 설정 (테마, 라우팅)
+├── core/           # UI 없는 인프라 코드 (API 클라이언트, 스토리지)
+├── features/       # 화면/도메인 단위 모듈
+│   ├── auth/
+│   ├── goals/
+│   ├── home/
+│   ├── mypage/
+│   ├── routine/
+│   ├── schedule/
+│   └── tracking/
+└── shared/         # 2개 이상의 feature에서 재사용하는 코드
+    ├── providers/
+    ├── utils/
+    └── widgets/
 ```
+
+각 feature 폴더는 필요에 따라 `models/`, `repositories/`, `widgets/` 하위 패키지 구조로 구성한다.
 
 ## 주의사항
 
