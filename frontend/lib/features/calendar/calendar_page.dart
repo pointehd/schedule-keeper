@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
+import '../../shared/models/plan.dart';
+import '../edit_plan/edit_plan_page.dart';
 
 const Color kPrimary = Color(0xFF5B5FC7);
 
@@ -18,8 +20,9 @@ class _CalendarPageState extends State<CalendarPage> {
   int get _daysInMonth =>
       DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0).day;
 
+  // Sunday-first: Sun=0, Mon=1, … Sat=6  (DateTime.weekday: Mon=1…Sun=7)
   int get _firstWeekday =>
-      DateTime(_focusedMonth.year, _focusedMonth.month, 1).weekday;
+      DateTime(_focusedMonth.year, _focusedMonth.month, 1).weekday % 7;
 
   @override
   Widget build(BuildContext context) {
@@ -88,7 +91,7 @@ class _CalendarPageState extends State<CalendarPage> {
                     ),
                     const SizedBox(height: 12),
                     Row(
-                      children: ['월', '화', '수', '목', '금', '토', '일']
+                      children: ['일', '월', '화', '수', '목', '금', '토']
                           .asMap()
                           .entries
                           .map((e) => Expanded(
@@ -98,9 +101,11 @@ class _CalendarPageState extends State<CalendarPage> {
                                     style: TextStyle(
                                       fontSize: 12,
                                       fontWeight: FontWeight.w500,
-                                      color: e.key >= 5
+                                      color: e.key == 0
                                           ? const Color(0xFFFF3B30)
-                                          : const Color(0xFF888888),
+                                          : e.key == 6
+                                              ? const Color(0xFF2979FF)
+                                              : const Color(0xFF888888),
                                     ),
                                   ),
                                 ),
@@ -108,7 +113,7 @@ class _CalendarPageState extends State<CalendarPage> {
                           .toList(),
                     ),
                     const SizedBox(height: 8),
-                    _buildGrid(),
+                    _buildGrid(notifier),
                   ],
                 ),
               ),
@@ -124,8 +129,8 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
-  Widget _buildGrid() {
-    final offset = _firstWeekday - 1;
+  Widget _buildGrid(PlanNotifier notifier) {
+    final offset = _firstWeekday; // Sunday-first offset (0=Sun)
     final total = offset + _daysInMonth;
     final rows = (total / 7).ceil();
     final now = DateTime.now();
@@ -143,10 +148,9 @@ class _CalendarPageState extends State<CalendarPage> {
                 DateTime(_focusedMonth.year, _focusedMonth.month, day);
             final isToday = _sameDay(date, now);
             final isSel = _sameDay(date, _selectedDay);
-            final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
-            final isWeekend = date.weekday >= 6;
-            final indicatorColors = [kPrimary, const Color(0xFF34C759), const Color(0xFFFF9500)];
-            final indColor = indicatorColors[date.weekday % indicatorColors.length];
+            final isSaturday = date.weekday == 6;
+            final isSunday = date.weekday == 7;
+            final indColor = _dayIndicatorColor(date, now, notifier);
 
             return Expanded(
               child: GestureDetector(
@@ -177,15 +181,17 @@ class _CalendarPageState extends State<CalendarPage> {
                                   : FontWeight.normal,
                               color: isSel
                                   ? Colors.white
-                                  : isWeekend
+                                  : isSunday
                                       ? const Color(0xFFFF3B30)
-                                      : const Color(0xFF1A1A1A),
+                                      : isSaturday
+                                          ? const Color(0xFF2979FF)
+                                          : const Color(0xFF1A1A1A),
                             ),
                           ),
                         ),
                       ),
                       const SizedBox(height: 2),
-                      if (isPast)
+                      if (indColor != null)
                         Container(
                           width: 20,
                           height: 3,
@@ -207,6 +213,26 @@ class _CalendarPageState extends State<CalendarPage> {
     );
   }
 
+  // Purple : focus time > daily free time (초과 달성)
+  // Green  : completion rate ≥ 80 %
+  // Red    : focus time < 20 % of daily free time
+  // Orange : anything in between
+  // null   : no plans for that date (no dot)
+  Color? _dayIndicatorColor(DateTime date, DateTime now, PlanNotifier notifier) {
+    if (date.isAfter(DateTime(now.year, now.month, now.day))) return null;
+    final plans = notifier.plansForDate(date);
+    if (plans.isEmpty) return null;
+
+    final freeHours = notifier.freeHoursForWeekday(date.weekday);
+    final focusHours = notifier.focusHoursForDate(date);
+    final completionRate = notifier.completedCountForDate(date) / plans.length;
+
+    if (freeHours > 0 && focusHours > freeHours) return kPrimary;
+    if (freeHours > 0 && focusHours < freeHours * 0.2) return const Color(0xFFFF3B30);
+    if (completionRate >= 0.8) return const Color(0xFF34C759);
+    return const Color(0xFFFF9500);
+  }
+
   bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
 }
@@ -224,8 +250,12 @@ class _SelectedDayDetail extends StatelessWidget {
       '월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'
     ];
     final weekdayName = weekdayNames[selectedDay.weekday - 1];
-    final plans = notifier.plans;
-    final done = plans.where((p) => p.isDone).length;
+    final plans = notifier.plansForDate(selectedDay);
+    final done = notifier.completedCountForDate(selectedDay);
+    final freeH = notifier.freeHoursForWeekday(selectedDay.weekday);
+    final usedH = notifier.focusHoursForDate(selectedDay);
+    final progress = freeH > 0 ? (usedH / freeH).clamp(0.0, 1.0) : 0.0;
+    final isOver = usedH > freeH;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -268,24 +298,29 @@ class _SelectedDayDetail extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
-                  children: const [
-                    Expanded(
+                  children: [
+                    const Expanded(
                       child: Text('여유시간 사용',
                           style: TextStyle(
                               fontSize: 13, color: Color(0xFF555555))),
                     ),
-                    Text('1.3h / 6h',
-                        style: TextStyle(
-                            fontSize: 13, color: Color(0xFF888888))),
+                    Text(
+                      '${usedH.toStringAsFixed(1)}h / ${freeH.toStringAsFixed(0)}h',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: isOver ? kPrimary : const Color(0xFF888888),
+                          fontWeight: isOver ? FontWeight.w600 : FontWeight.normal),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 6),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(4),
-                  child: const LinearProgressIndicator(
-                    value: 0.22,
-                    backgroundColor: Color(0xFFF0F0F0),
-                    valueColor: AlwaysStoppedAnimation(kPrimary),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: const Color(0xFFF0F0F0),
+                    valueColor: AlwaysStoppedAnimation(
+                        isOver ? kPrimary : kPrimary),
                     minHeight: 6,
                   ),
                 ),
@@ -294,68 +329,242 @@ class _SelectedDayDetail extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Expanded(
-            child: ListView.builder(
-              itemCount: plans.length,
-              itemBuilder: (context, i) {
-                final plan = plans[i];
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 8),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    children: [
-                      AnimatedContainer(
-                        duration: const Duration(milliseconds: 200),
-                        width: 20,
-                        height: 20,
-                        decoration: BoxDecoration(
-                          color: plan.isDone ? kPrimary : Colors.white,
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                              color: plan.isDone
-                                  ? kPrimary
-                                  : const Color(0xFFCCCCCC)),
+            child: plans.isEmpty
+                ? const Center(
+                    child: Text('이 날의 계획이 없습니다',
+                        style: TextStyle(
+                            fontSize: 14, color: Color(0xFFBBBBBB))),
+                  )
+                : ListView.builder(
+                    itemCount: plans.length,
+                    itemBuilder: (context, i) {
+                      final plan = plans[i];
+                      return GestureDetector(
+                        onLongPress: () =>
+                            _showPlanOptions(context, plan, notifier),
+                        child: Container(
+                          margin: const EdgeInsets.only(bottom: 8),
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12)),
+                          child: Row(
+                            children: [
+                              AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                width: 20,
+                                height: 20,
+                                decoration: BoxDecoration(
+                                  color: plan.isDone ? kPrimary : Colors.white,
+                                  borderRadius: BorderRadius.circular(6),
+                                  border: Border.all(
+                                      color: plan.isDone
+                                          ? kPrimary
+                                          : const Color(0xFFCCCCCC)),
+                                ),
+                                child: plan.isDone
+                                    ? const Icon(Icons.check,
+                                        color: Colors.white, size: 14)
+                                    : null,
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(plan.name,
+                                        style: const TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500)),
+                                    Text(
+                                      '${plan.category.label} · ${plan.shortProgressLabel}',
+                                      style: const TextStyle(
+                                          fontSize: 11,
+                                          color: Color(0xFF888888)),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              Container(
+                                width: 4,
+                                height: 32,
+                                decoration: BoxDecoration(
+                                  color: plan.category.color,
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                        child: plan.isDone
-                            ? const Icon(Icons.check,
-                                color: Colors.white, size: 14)
-                            : null,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(plan.name,
-                                style: const TextStyle(
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w500)),
-                            Text(
-                              '${plan.category.label} · ${plan.shortProgressLabel}',
-                              style: const TextStyle(
-                                  fontSize: 11,
-                                  color: Color(0xFF888888)),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Container(
-                        width: 4,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: plan.category.color,
-                          borderRadius: BorderRadius.circular(2),
-                        ),
-                      ),
-                    ],
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showPlanOptions(
+      BuildContext context, Plan plan, PlanNotifier notifier) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFDDDDDD),
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                        color: plan.category.color, shape: BoxShape.circle),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      plan.name,
+                      style: const TextStyle(
+                          fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 4),
+              Text(
+                plan.category.label,
+                style: const TextStyle(fontSize: 12, color: Color(0xFF888888)),
+              ),
+              const SizedBox(height: 16),
+              const Divider(height: 1),
+              _OptionTile(
+                icon: Icons.edit_outlined,
+                label: '수정',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => EditPlanPage(planId: plan.id),
+                    ),
+                  );
+                },
+              ),
+              _OptionTile(
+                icon: Icons.stop_circle_outlined,
+                label: '종료',
+                subtitle: '오늘부터 이 계획을 중단합니다 (과거 기록 유지)',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  notifier.endPlan(plan.id);
+                },
+              ),
+              _OptionTile(
+                icon: Icons.delete_outline,
+                label: '삭제',
+                subtitle: '계획과 모든 기록을 완전히 삭제합니다',
+                color: const Color(0xFFFF3B30),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _confirmDelete(context, plan, notifier);
+                },
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _confirmDelete(
+      BuildContext context, Plan plan, PlanNotifier notifier) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('계획 삭제'),
+        content: Text('"${plan.name}" 계획과 모든 수행 기록이 삭제됩니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              notifier.deletePlan(plan.id);
+            },
+            child: const Text('삭제', style: TextStyle(color: Color(0xFFFF3B30))),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final Color? color;
+  final VoidCallback onTap;
+
+  const _OptionTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final c = color ?? const Color(0xFF1A1A1A);
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(10),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, size: 22, color: c),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(label,
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w500,
+                          color: c)),
+                  if (subtitle != null)
+                    Text(subtitle!,
+                        style: const TextStyle(
+                            fontSize: 11, color: Color(0xFF888888))),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

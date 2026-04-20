@@ -24,6 +24,64 @@ enum MeasureType {
   final String subtitle;
 }
 
+/// One snapshot of plan fields — created when a plan is first added or edited.
+class PlanVersion {
+  final DateTime effectiveFrom; // this version applies from this date onwards
+  final String name;
+  final PlanCategory category;
+  final MeasureType measureType;
+  final double target;
+  final List<int> repeatDays; // empty = every day; 1=Mon…7=Sun
+
+  PlanVersion({
+    required this.effectiveFrom,
+    required this.name,
+    required this.category,
+    required this.measureType,
+    required this.target,
+    List<int>? repeatDays,
+  }) : repeatDays = repeatDays ?? [];
+}
+
+/// Persistent plan definition stored in Hive.
+class PlanRecord {
+  final String id;
+  final DateTime createdDate;
+  DateTime? endDate; // set by '종료' — plan hidden from this date onwards
+  List<PlanVersion> versions; // sorted ASC by effectiveFrom
+
+  PlanRecord({
+    required this.id,
+    required this.createdDate,
+    required this.versions,
+    this.endDate,
+  });
+
+  static DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+
+  /// Returns the applicable version for [date], or null if none.
+  PlanVersion? versionForDate(DateTime date) {
+    final d = _dateOnly(date);
+    PlanVersion? result;
+    for (final v in versions) {
+      if (!v.effectiveFrom.isAfter(d)) result = v;
+    }
+    return result;
+  }
+
+  /// Whether this plan should appear on [date].
+  bool appliesOnDate(DateTime date) {
+    final d = _dateOnly(date);
+    if (createdDate.isAfter(d)) return false;
+    if (endDate != null && !d.isBefore(endDate!)) return false;
+    final v = versionForDate(d);
+    if (v == null) return false;
+    if (v.repeatDays.isEmpty) return true;
+    return v.repeatDays.contains(d.weekday);
+  }
+}
+
+/// Display model — combines PlanRecord version + DailyProgress for the UI.
 class Plan {
   final String id;
   final String name;
@@ -31,6 +89,7 @@ class Plan {
   final MeasureType measureType;
   final double target;
   final List<int> repeatDays;
+  final DateTime createdDate;
   double current;
   bool isCompleted;
 
@@ -41,9 +100,13 @@ class Plan {
     required this.measureType,
     required this.target,
     List<int>? repeatDays,
+    DateTime? createdDate,
     this.current = 0,
     this.isCompleted = false,
-  }) : repeatDays = repeatDays ?? [];
+  })  : repeatDays = repeatDays ?? [],
+        createdDate = _dateOnly(createdDate ?? DateTime.now());
+
+  static DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
 
   double get progress {
     if (measureType == MeasureType.check) return isCompleted ? 1.0 : 0.0;
@@ -66,4 +129,19 @@ class Plan {
         return isCompleted ? '완료' : '대기';
     }
   }
+}
+
+/// Per-day execution record for a single plan.
+class DailyProgress {
+  final String planId;
+  final DateTime date;
+  double current;
+  bool isCompleted;
+
+  DailyProgress({
+    required this.planId,
+    required this.date,
+    this.current = 0,
+    this.isCompleted = false,
+  });
 }

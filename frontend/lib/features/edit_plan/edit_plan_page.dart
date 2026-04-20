@@ -5,28 +5,45 @@ import '../../shared/providers/plan_provider.dart';
 
 const Color kPrimary = Color(0xFF5B5FC7);
 
-class AddPlanPage extends StatefulWidget {
-  final VoidCallback onCancel;
-  final VoidCallback onSaved;
-
-  const AddPlanPage({
-    super.key,
-    required this.onCancel,
-    required this.onSaved,
-  });
+class EditPlanPage extends StatefulWidget {
+  final String planId;
+  const EditPlanPage({super.key, required this.planId});
 
   @override
-  State<AddPlanPage> createState() => _AddPlanPageState();
+  State<EditPlanPage> createState() => _EditPlanPageState();
 }
 
-class _AddPlanPageState extends State<AddPlanPage> {
+class _EditPlanPageState extends State<EditPlanPage> {
   final _nameCtrl = TextEditingController();
-  PlanCategory _category = PlanCategory.study;
-  MeasureType _measureType = MeasureType.time;
-  double _target = 30;
-  final Set<int> _repeatDays = {};
+  late PlanCategory _category;
+  late MeasureType _measureType;
+  late double _target;
+  late Set<int> _repeatDays;
+  bool _loaded = false;
 
   static const _weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_loaded) {
+      final plan =
+          context.read<PlanNotifier>().currentPlanSnapshot(widget.planId);
+      if (plan != null) {
+        _nameCtrl.text = plan.name;
+        _category = plan.category;
+        _measureType = plan.measureType;
+        _target = plan.target;
+        _repeatDays = Set.from(plan.repeatDays);
+      } else {
+        _category = PlanCategory.study;
+        _measureType = MeasureType.time;
+        _target = 30;
+        _repeatDays = {};
+      }
+      _loaded = true;
+    }
+  }
 
   @override
   void dispose() {
@@ -36,29 +53,17 @@ class _AddPlanPageState extends State<AddPlanPage> {
 
   bool get _canSave => _nameCtrl.text.trim().isNotEmpty;
 
-  void _reset() {
-    _nameCtrl.clear();
-    setState(() {
-      _category = PlanCategory.study;
-      _measureType = MeasureType.time;
-      _target = 30;
-      _repeatDays.clear();
-    });
-  }
-
   void _save() {
     if (!_canSave) return;
-    context.read<PlanNotifier>().addPlan(Plan(
-          id: DateTime.now().millisecondsSinceEpoch.toString(),
+    context.read<PlanNotifier>().editPlan(
+          widget.planId,
           name: _nameCtrl.text.trim(),
           category: _category,
           measureType: _measureType,
           target: _target,
           repeatDays: _repeatDays.toList()..sort(),
-          createdDate: DateTime.now(),
-        ));
-    _reset();
-    widget.onSaved();
+        );
+    Navigator.pop(context, true);
   }
 
   @override
@@ -71,29 +76,22 @@ class _AddPlanPageState extends State<AddPlanPage> {
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
           color: const Color(0xFF888888),
-          onPressed: widget.onCancel,
+          onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('새 계획',
+        title: const Text('계획 수정',
             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
         centerTitle: true,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            color: const Color(0xFF888888),
-            tooltip: '초기화',
-            onPressed: _reset,
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // 스크롤 가능한 폼 영역
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  _buildVersionNotice(),
+                  const SizedBox(height: 16),
                   _SectionLabel('계획 이름'),
                   const SizedBox(height: 8),
                   _Card(
@@ -101,7 +99,7 @@ class _AddPlanPageState extends State<AddPlanPage> {
                       controller: _nameCtrl,
                       onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(
-                        hintText: '예: 매일 영어 단어 30개',
+                        hintText: '계획 이름을 입력하세요',
                         hintStyle: TextStyle(color: Color(0xFFBBBBBB)),
                         border: InputBorder.none,
                         contentPadding: EdgeInsets.zero,
@@ -165,8 +163,8 @@ class _AddPlanPageState extends State<AddPlanPage> {
                     children: [
                       _SectionLabel('측정 방식'),
                       const Text('계획 진행률을 어떻게 기록할지 골라주세요',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF888888))),
+                          style:
+                              TextStyle(fontSize: 11, color: Color(0xFF888888))),
                     ],
                   ),
                   const SizedBox(height: 8),
@@ -252,15 +250,13 @@ class _AddPlanPageState extends State<AddPlanPage> {
                           Text(
                             '${_target.round()}',
                             style: const TextStyle(
-                                fontSize: 36,
-                                fontWeight: FontWeight.bold),
+                                fontSize: 36, fontWeight: FontWeight.bold),
                           ),
                           const SizedBox(width: 6),
                           Text(
                             _measureType == MeasureType.time ? '분' : '개',
                             style: const TextStyle(
-                                fontSize: 18,
-                                color: Color(0xFF888888)),
+                                fontSize: 18, color: Color(0xFF888888)),
                           ),
                         ],
                       ),
@@ -273,45 +269,37 @@ class _AddPlanPageState extends State<AddPlanPage> {
                               _QuickBtn(
                                   label: '10분',
                                   selected: _target == 10,
-                                  onTap: () =>
-                                      setState(() => _target = 10)),
+                                  onTap: () => setState(() => _target = 10)),
                               _QuickBtn(
                                   label: '30분',
                                   selected: _target == 30,
-                                  onTap: () =>
-                                      setState(() => _target = 30)),
+                                  onTap: () => setState(() => _target = 30)),
                               _QuickBtn(
                                   label: '1h',
                                   selected: _target == 60,
-                                  onTap: () =>
-                                      setState(() => _target = 60)),
+                                  onTap: () => setState(() => _target = 60)),
                               _QuickBtn(
                                   label: '2h',
                                   selected: _target == 120,
-                                  onTap: () =>
-                                      setState(() => _target = 120)),
+                                  onTap: () => setState(() => _target = 120)),
                             ]
                           : [
                               _QuickBtn(
                                   label: '5개',
                                   selected: _target == 5,
-                                  onTap: () =>
-                                      setState(() => _target = 5)),
+                                  onTap: () => setState(() => _target = 5)),
                               _QuickBtn(
                                   label: '10개',
                                   selected: _target == 10,
-                                  onTap: () =>
-                                      setState(() => _target = 10)),
+                                  onTap: () => setState(() => _target = 10)),
                               _QuickBtn(
                                   label: '20개',
                                   selected: _target == 20,
-                                  onTap: () =>
-                                      setState(() => _target = 20)),
+                                  onTap: () => setState(() => _target = 20)),
                               _QuickBtn(
                                   label: '30개',
                                   selected: _target == 30,
-                                  onTap: () =>
-                                      setState(() => _target = 30)),
+                                  onTap: () => setState(() => _target = 30)),
                             ],
                     ),
                   ],
@@ -400,18 +388,15 @@ class _AddPlanPageState extends State<AddPlanPage> {
               ),
             ),
           ),
-
-          // 하단 저장 버튼 (항상 고정)
           Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
             decoration: const BoxDecoration(
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Color(0x0F000000),
-                  blurRadius: 8,
-                  offset: Offset(0, -2),
-                ),
+                    color: Color(0x0F000000),
+                    blurRadius: 8,
+                    offset: Offset(0, -2))
               ],
             ),
             child: SizedBox(
@@ -428,10 +413,32 @@ class _AddPlanPageState extends State<AddPlanPage> {
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12)),
                 ),
-                child: const Text('저장',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.w600)),
+                child: const Text('수정 저장',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildVersionNotice() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: kPrimary.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: const [
+          Icon(Icons.info_outline, size: 16, color: kPrimary),
+          SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '오늘부터 변경 내용이 적용됩니다. 이전 날짜의 기록은 유지됩니다.',
+              style: TextStyle(fontSize: 12, color: kPrimary),
             ),
           ),
         ],
@@ -482,8 +489,7 @@ class _QuickBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: selected
               ? kPrimary.withValues(alpha: 0.1)
@@ -496,9 +502,8 @@ class _QuickBtn extends StatelessWidget {
             style: TextStyle(
                 fontSize: 13,
                 color: selected ? kPrimary : const Color(0xFF555555),
-                fontWeight: selected
-                    ? FontWeight.w600
-                    : FontWeight.normal)),
+                fontWeight:
+                    selected ? FontWeight.w600 : FontWeight.normal)),
       ),
     );
   }
@@ -514,15 +519,13 @@ class _QuickDayBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: const Color(0xFFF5F5F5),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Text(label,
-            style: const TextStyle(
-                fontSize: 13, color: Color(0xFF555555))),
+            style: const TextStyle(fontSize: 13, color: Color(0xFF555555))),
       ),
     );
   }
