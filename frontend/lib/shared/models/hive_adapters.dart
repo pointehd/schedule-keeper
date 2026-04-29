@@ -4,6 +4,7 @@ import 'plan.dart';
 // typeId 0 → PlanVersion
 // typeId 1 → DailyProgress
 // typeId 2 → PlanRecord
+// typeId 3 → FreeHoursSnapshot
 
 class PlanVersionAdapter extends TypeAdapter<PlanVersion> {
   @override
@@ -52,6 +53,25 @@ class DailyProgressAdapter extends TypeAdapter<DailyProgress> {
     writer.writeInt(obj.date.millisecondsSinceEpoch);
     writer.writeDouble(obj.current);
     writer.writeBool(obj.isCompleted);
+  }
+}
+
+class FreeHoursSnapshotAdapter extends TypeAdapter<FreeHoursSnapshot> {
+  @override
+  final int typeId = 3;
+
+  @override
+  FreeHoursSnapshot read(BinaryReader reader) {
+    return FreeHoursSnapshot(
+      effectiveFrom: DateTime.fromMillisecondsSinceEpoch(reader.readInt()),
+      hours: reader.readList().cast<double>(),
+    );
+  }
+
+  @override
+  void write(BinaryWriter writer, FreeHoursSnapshot obj) {
+    writer.writeInt(obj.effectiveFrom.millisecondsSinceEpoch);
+    writer.writeList(obj.hours);
   }
 }
 

@@ -6,7 +6,9 @@ import '../models/plan.dart';
 
 const _kTimerId = 'timer_plan_id';
 const _kTimerStartMs = 'timer_start_ms';
-const _kFreeHours = 'free_hours';
+const _kFreeHoursLegacy = 'free_hours';
+const _kFreeHoursInitKey = '19700101';
+const _kFirstOpenDate = 'first_open_date_ms';
 
 class PlanNotifier extends ChangeNotifier {
   PlanNotifier() {
@@ -15,8 +17,9 @@ class PlanNotifier extends ChangeNotifier {
 
   late final Box<PlanRecord> _planBox;
   late final Box<DailyProgress> _progressBox;
+  late final Box<FreeHoursSnapshot> _freeHoursBox;
 
-  final List<double> _freeHours = [4, 4, 4, 4, 3, 6, 6];
+  static const List<double> _defaultHours = [4, 4, 4, 4, 3, 6, 6];
 
   SharedPreferences? _prefs;
   String? _activeTimerId;
@@ -102,10 +105,54 @@ class PlanNotifier extends ChangeNotifier {
     );
   }
 
-  List<double> get freeHours => List.unmodifiable(_freeHours);
-  double get weeklyFreeHours => _freeHours.fold(0, (a, b) => a + b);
-  double freeHoursForWeekday(int weekday) => _freeHours[(weekday - 1) % 7];
-  double get todayFreeHours => freeHoursForWeekday(DateTime.now().weekday);
+  static String _freeHoursKey(DateTime date) =>
+      '${date.year}${date.month.toString().padLeft(2, '0')}${date.day.toString().padLeft(2, '0')}';
+
+  static DateTime? _parseDateKey(String key) {
+    if (key.length != 8) return null;
+    final y = int.tryParse(key.substring(0, 4));
+    final m = int.tryParse(key.substring(4, 6));
+    final d = int.tryParse(key.substring(6, 8));
+    if (y == null || m == null || d == null) return null;
+    return DateTime(y, m, d);
+  }
+
+  /// Finds the most recent snapshot whose effectiveFrom is on or before [date].
+  FreeHoursSnapshot? _snapshotForDate(DateTime date) {
+    final d = _dateOnly(date);
+    FreeHoursSnapshot? result;
+    for (final snap in _freeHoursBox.values) {
+      if (!snap.effectiveFrom.isAfter(d)) {
+        if (result == null || snap.effectiveFrom.isAfter(result.effectiveFrom)) {
+          result = snap;
+        }
+      }
+    }
+    return result;
+  }
+
+  // Returns the current (today's) free-hours settings for the settings UI.
+  List<double> get freeHours {
+    final snap = _snapshotForDate(DateTime.now());
+    return List.unmodifiable(snap?.hours ?? _defaultHours);
+  }
+
+  double get weeklyFreeHours => freeHours.fold(0, (a, b) => a + b);
+
+  // Returns free hours for a specific calendar date — uses the snapshot active on that date.
+  double freeHoursForDate(DateTime date) {
+    final snap = _snapshotForDate(date);
+    final hours = snap?.hours ?? _defaultHours;
+    return hours[(date.weekday - 1) % 7];
+  }
+
+  // Returns current snapshot's value for a weekday (used by settings UI).
+  double freeHoursForWeekday(int weekday) {
+    final snap = _snapshotForDate(DateTime.now());
+    return (snap?.hours ?? _defaultHours)[(weekday - 1) % 7];
+  }
+
+  double get todayFreeHours => freeHoursForDate(DateTime.now());
 
   bool isTimerActive(String id) => _activeTimerId == id;
 
@@ -245,7 +292,7 @@ class PlanNotifier extends ChangeNotifier {
       _clearTimerState();
     }
     final prog = _progressFor(id, today);
-    prog.current = value.clamp(0, v.target);
+    prog.current = value.clamp(0, double.infinity);
     _progressBox.put(_progressKey(id, today), prog);
     notifyListeners();
   }
@@ -278,18 +325,78 @@ class PlanNotifier extends ChangeNotifier {
 
   void setFreeHours(int index, double hours) {
     if (index < 0 || index >= 7) return;
-    _freeHours[index] = hours.clamp(0, 12);
-    _saveFreeHours();
+    final today = _dateOnly(DateTime.now());
+    final key = _freeHoursKey(today);
+    final base = List<double>.from(_snapshotForDate(today)?.hours ?? _defaultHours);
+    base[index] = hours.clamp(0, 12);
+    _freeHoursBox.put(key, FreeHoursSnapshot(effectiveFrom: today, hours: base));
     notifyListeners();
   }
 
   void resetFreeHours() {
-    const defaults = [4.0, 4.0, 4.0, 4.0, 3.0, 6.0, 6.0];
-    for (int i = 0; i < 7; i++) {
-      _freeHours[i] = defaults[i];
-    }
-    _saveFreeHours();
+    final today = _dateOnly(DateTime.now());
+    _freeHoursBox.put(
+      _freeHoursKey(today),
+      FreeHoursSnapshot(effectiveFrom: today, hours: List.of(_defaultHours)),
+    );
     notifyListeners();
+  }
+
+  /// Calendar long-press: change a single weekday slot only for [date]'s snapshot.
+  void setFreeHoursForDate(DateTime date, int index, double hours) {
+    if (index < 0 || index >= 7) return;
+    final d = _dateOnly(date);
+    final key = _freeHoursKey(d);
+    final base = List<double>.from(_snapshotForDate(d)?.hours ?? _defaultHours);
+    base[index] = hours.clamp(0, 12);
+    _freeHoursBox.put(key, FreeHoursSnapshot(effectiveFrom: d, hours: base));
+    notifyListeners();
+  }
+
+  // ── free time gap-fill ────────────────────────────────────
+
+  /// On every app open: fills any days since last recorded snapshot up to today.
+  void _fillMissingDays() {
+    final today = _dateOnly(DateTime.now());
+    final firstOpenMs = _prefs?.getInt(_kFirstOpenDate);
+
+    if (firstOpenMs == null) {
+      _prefs?.setInt(_kFirstOpenDate, today.millisecondsSinceEpoch);
+      _ensureSnapshot(today);
+      return;
+    }
+
+    // Find the latest explicitly-snapshotted day (skip the sentinel).
+    DateTime? lastSnapshotted;
+    for (final key in _freeHoursBox.keys.cast<String>()) {
+      if (key == _kFreeHoursInitKey) continue;
+      final date = _parseDateKey(key);
+      if (date != null && (lastSnapshotted == null || date.isAfter(lastSnapshotted))) {
+        lastSnapshotted = date;
+      }
+    }
+
+    final firstOpen = _dateOnly(DateTime.fromMillisecondsSinceEpoch(firstOpenMs));
+    DateTime cursor = lastSnapshotted != null
+        ? lastSnapshotted.add(const Duration(days: 1))
+        : firstOpen;
+
+    while (!cursor.isAfter(today)) {
+      _ensureSnapshot(cursor);
+      cursor = cursor.add(const Duration(days: 1));
+    }
+  }
+
+  void _ensureSnapshot(DateTime date) {
+    final d = _dateOnly(date);
+    final key = _freeHoursKey(d);
+    if (!_freeHoursBox.containsKey(key)) {
+      final snap = _snapshotForDate(d);
+      _freeHoursBox.put(
+        key,
+        FreeHoursSnapshot(effectiveFrom: d, hours: List.of(snap?.hours ?? _defaultHours)),
+      );
+    }
   }
 
   // ── internal ──────────────────────────────────────────────
@@ -297,18 +404,31 @@ class PlanNotifier extends ChangeNotifier {
   Future<void> _init() async {
     _planBox = Hive.box<PlanRecord>('plan_records');
     _progressBox = Hive.box<DailyProgress>('progress');
+    _freeHoursBox = Hive.box<FreeHoursSnapshot>('free_hours_history');
 
     _prefs = await SharedPreferences.getInstance();
 
-    final saved = _prefs?.getString(_kFreeHours);
-    if (saved != null) {
-      final parts = saved.split(',');
-      if (parts.length == 7) {
-        for (int i = 0; i < 7; i++) {
-          _freeHours[i] = double.tryParse(parts[i]) ?? _freeHours[i];
+    // Migrate from legacy SharedPreferences on first launch after update.
+    if (_freeHoursBox.isEmpty) {
+      final saved = _prefs?.getString(_kFreeHoursLegacy);
+      List<double> migratedHours = List.of(_defaultHours);
+      if (saved != null) {
+        final parts = saved.split(',');
+        if (parts.length == 7) {
+          migratedHours = parts
+              .asMap()
+              .entries
+              .map((e) => double.tryParse(e.value) ?? _defaultHours[e.key])
+              .toList();
         }
       }
+      _freeHoursBox.put(
+        _kFreeHoursInitKey,
+        FreeHoursSnapshot(effectiveFrom: DateTime(1970), hours: migratedHours),
+      );
     }
+
+    _fillMissingDays();
 
     final id = _prefs?.getString(_kTimerId);
     final startMs = _prefs?.getInt(_kTimerStartMs);
@@ -351,10 +471,6 @@ class PlanNotifier extends ChangeNotifier {
   void _clearTimerState() {
     _prefs?.remove(_kTimerId);
     _prefs?.remove(_kTimerStartMs);
-  }
-
-  void _saveFreeHours() {
-    _prefs?.setString(_kFreeHours, _freeHours.join(','));
   }
 
   @override

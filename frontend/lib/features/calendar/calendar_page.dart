@@ -41,8 +41,14 @@ class _CalendarPageState extends State<CalendarPage> {
                       style: TextStyle(
                           fontSize: 22, fontWeight: FontWeight.bold)),
                   const Spacer(),
-                  const Icon(Icons.settings_outlined,
-                      color: Color(0xFF888888)),
+                  GestureDetector(
+                    onTap: () => setState(() {
+                      _selectedDay = DateTime.now();
+                      _focusedMonth = DateTime.now();
+                    }),
+                    child: const Icon(Icons.today_outlined,
+                        color: Color(0xFF888888)),
+                  ),
                 ],
               ),
             ),
@@ -223,7 +229,7 @@ class _CalendarPageState extends State<CalendarPage> {
     final plans = notifier.plansForDate(date);
     if (plans.isEmpty) return null;
 
-    final freeHours = notifier.freeHoursForWeekday(date.weekday);
+    final freeHours = notifier.freeHoursForDate(date);
     final focusHours = notifier.focusHoursForDate(date);
     final completionRate = notifier.completedCountForDate(date) / plans.length;
 
@@ -252,10 +258,12 @@ class _SelectedDayDetail extends StatelessWidget {
     final weekdayName = weekdayNames[selectedDay.weekday - 1];
     final plans = notifier.plansForDate(selectedDay);
     final done = notifier.completedCountForDate(selectedDay);
-    final freeH = notifier.freeHoursForWeekday(selectedDay.weekday);
+    final freeH = notifier.freeHoursForDate(selectedDay);
     final usedH = notifier.focusHoursForDate(selectedDay);
     final progress = freeH > 0 ? (usedH / freeH).clamp(0.0, 1.0) : 0.0;
     final isOver = usedH > freeH;
+    final today = DateTime.now();
+    final isPast = selectedDay.isBefore(DateTime(today.year, today.month, today.day));
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -289,42 +297,49 @@ class _SelectedDayDetail extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(12)),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    const Expanded(
-                      child: Text('여유시간 사용',
-                          style: TextStyle(
-                              fontSize: 13, color: Color(0xFF555555))),
-                    ),
-                    Text(
-                      '${usedH.toStringAsFixed(1)}h / ${freeH.toStringAsFixed(0)}h',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: isOver ? kPrimary : const Color(0xFF888888),
-                          fontWeight: isOver ? FontWeight.w600 : FontWeight.normal),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 6),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    backgroundColor: const Color(0xFFF0F0F0),
-                    valueColor: AlwaysStoppedAnimation(
-                        isOver ? kPrimary : kPrimary),
-                    minHeight: 6,
+          GestureDetector(
+            onLongPress: isPast ? null : () => _showFreeTimeEditor(context, selectedDay, freeH, notifier),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12)),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text('여유시간 사용',
+                            style: TextStyle(
+                                fontSize: 13, color: Color(0xFF555555))),
+                      ),
+                      Text(
+                        '${fmtHours(usedH)} / ${fmtHours(freeH)}',
+                        style: TextStyle(
+                            fontSize: 13,
+                            color: isOver ? kPrimary : const Color(0xFF888888),
+                            fontWeight: isOver ? FontWeight.w600 : FontWeight.normal),
+                      ),
+                      if (!isPast) ...[
+                        const SizedBox(width: 6),
+                        const Icon(Icons.edit_outlined,
+                            size: 13, color: Color(0xFFCCCCCC)),
+                      ],
+                    ],
                   ),
-                ),
-              ],
+                  const SizedBox(height: 6),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      backgroundColor: const Color(0xFFF0F0F0),
+                      valueColor: const AlwaysStoppedAnimation(kPrimary),
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
           const SizedBox(height: 8),
@@ -401,6 +416,120 @@ class _SelectedDayDetail extends StatelessWidget {
                   ),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showFreeTimeEditor(
+      BuildContext context, DateTime date, double currentHours, PlanNotifier notifier) {
+    const weekdayNames = ['월', '화', '수', '목', '금', '토', '일'];
+    final weekdayIndex = (date.weekday - 1) % 7;
+    final dayLabel = '${date.month}월 ${date.day}일 (${weekdayNames[weekdayIndex]})';
+    double tempHours = currentHours;
+
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) => SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFDDDDDD),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    const Icon(Icons.schedule_rounded, color: kPrimary, size: 20),
+                    const SizedBox(width: 8),
+                    Text(
+                      '$dayLabel 여유시간',
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _FreeTimeStepButton(
+                      icon: Icons.remove,
+                      onTap: () {
+                        if (tempHours > 0) {
+                          setModalState(() => tempHours = (tempHours - 0.5).clamp(0, 12));
+                        }
+                      },
+                    ),
+                    const SizedBox(width: 24),
+                    Text(
+                      fmtHours(tempHours),
+                      style: const TextStyle(
+                        fontSize: 36, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const SizedBox(width: 24),
+                    _FreeTimeStepButton(
+                      icon: Icons.add,
+                      filled: true,
+                      onTap: () {
+                        if (tempHours < 12) {
+                          setModalState(() => tempHours = (tempHours + 0.5).clamp(0, 12));
+                        }
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                SliderTheme(
+                  data: SliderThemeData(
+                    trackHeight: 4,
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
+                    activeTrackColor: kPrimary,
+                    inactiveTrackColor: const Color(0xFFE0E0E0),
+                    thumbColor: kPrimary,
+                    overlayColor: kPrimary.withValues(alpha: 0.15),
+                  ),
+                  child: Slider(
+                    value: tempHours,
+                    min: 0,
+                    max: 12,
+                    divisions: 24,
+                    onChanged: (v) => setModalState(() => tempHours = v),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: () {
+                      notifier.setFreeHoursForDate(date, weekdayIndex, tempHours);
+                      Navigator.pop(ctx);
+                    },
+                    style: FilledButton.styleFrom(
+                      backgroundColor: kPrimary,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    child: const Text('저장', style: TextStyle(fontSize: 15)),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -515,6 +644,39 @@ class _SelectedDayDetail extends StatelessWidget {
             child: const Text('삭제', style: TextStyle(color: Color(0xFFFF3B30))),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _FreeTimeStepButton extends StatelessWidget {
+  final IconData icon;
+  final bool filled;
+  final VoidCallback onTap;
+
+  const _FreeTimeStepButton({
+    required this.icon,
+    this.filled = false,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: filled ? kPrimary : Colors.white,
+          border: filled ? null : Border.all(color: const Color(0xFFDDDDDD)),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(
+          icon,
+          size: 20,
+          color: filled ? Colors.white : const Color(0xFF555555),
+        ),
       ),
     );
   }

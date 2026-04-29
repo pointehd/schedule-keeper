@@ -151,7 +151,7 @@ class _ProgressCard extends StatelessWidget {
                   style: TextStyle(fontSize: 12, color: Colors.white70),
                 ),
                 Text(
-                  '${hours.toStringAsFixed(1)} h',
+                  fmtHours(hours),
                   style: const TextStyle(
                     fontSize: 30,
                     fontWeight: FontWeight.bold,

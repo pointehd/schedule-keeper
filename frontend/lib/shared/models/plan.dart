@@ -1,5 +1,15 @@
 import 'package:flutter/material.dart';
 
+/// Formats [minutes] as "HH:MM".
+String fmtMins(double minutes) {
+  final h = (minutes / 60).floor();
+  final m = (minutes % 60).round();
+  return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+}
+
+/// Formats [hours] as "HH:MM".
+String fmtHours(double hours) => fmtMins(hours * 60);
+
 enum PlanCategory {
   study('학습', Color(0xFF4A90E2)),
   reading('독서', Color(0xFFFF9500)),
@@ -120,15 +130,22 @@ class Plan {
   String get shortProgressLabel {
     switch (measureType) {
       case MeasureType.time:
-        final curH = current / 60;
-        final tarH = target / 60;
-        return '${curH.toStringAsFixed(1)}/${tarH.toStringAsFixed(1)}h';
+        return '${fmtMins(current)}/${fmtMins(target)}';
       case MeasureType.count:
         return '${current.round()}/${target.round()}';
       case MeasureType.check:
         return isCompleted ? '완료' : '대기';
     }
   }
+}
+
+/// One snapshot of free-time settings — created whenever the user changes a value.
+/// Applies from [effectiveFrom] until a newer snapshot exists.
+class FreeHoursSnapshot {
+  final DateTime effectiveFrom;
+  final List<double> hours; // index 0=Mon … 6=Sun
+
+  FreeHoursSnapshot({required this.effectiveFrom, required this.hours});
 }
 
 /// Per-day execution record for a single plan.

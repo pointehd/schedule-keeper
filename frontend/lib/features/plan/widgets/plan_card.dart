@@ -41,9 +41,7 @@ class _CardHeader extends StatelessWidget {
       MeasureType.check => '✓',
     };
     final targetLabel = switch (plan.measureType) {
-      MeasureType.time => plan.target >= 60
-          ? '${(plan.target / 60).toStringAsFixed(1)}h'
-          : '${plan.target.round()}분',
+      MeasureType.time => fmtMins(plan.target),
       MeasureType.count => '${plan.target.round()}개',
       MeasureType.check => '',
     };
@@ -220,9 +218,7 @@ class _TimeCard extends StatelessWidget {
     final ss = (totalSec % 60).toString().padLeft(2, '0');
     final timeStr = hh > 0 ? '$hh:$mm:$ss' : '$mm:$ss';
 
-    final targetStr = plan.target >= 60
-        ? '${(plan.target / 60).toStringAsFixed(1)}h'
-        : '${plan.target.round()}분';
+    final targetStr = fmtMins(plan.target);
     final barColor = progress >= 1.0
         ? const Color(0xFF34C759)
         : isRunning

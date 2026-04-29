@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
+import '../../shared/models/plan.dart';
 
 const Color kPrimary = Color(0xFF5B5FC7);
 const Color kWeekend = Color(0xFFD4873A);
@@ -34,7 +35,15 @@ class _MyPageView extends StatefulWidget {
 }
 
 class _MyPageViewState extends State<_MyPageView> {
-  static const List<String> _dayNames = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일'];
+  static const List<String> _dayNames = [
+    '월요일',
+    '화요일',
+    '수요일',
+    '목요일',
+    '금요일',
+    '토요일',
+    '일요일',
+  ];
 
   bool _isWeekend(int index) => index >= 5;
 
@@ -105,7 +114,11 @@ class _MyPageViewState extends State<_MyPageView> {
             backgroundColor: kPrimary,
             child: const Text(
               'H',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
           const SizedBox(width: 14),
@@ -113,7 +126,10 @@ class _MyPageViewState extends State<_MyPageView> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('하람', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                Text(
+                  '하람',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
                 SizedBox(height: 4),
                 Text(
                   '연속 12일 · 누적 134회 달성',
@@ -127,7 +143,9 @@ class _MyPageViewState extends State<_MyPageView> {
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF333333),
               side: const BorderSide(color: Color(0xFFDDDDDD)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             child: const Text('프로필 편집', style: TextStyle(fontSize: 13)),
@@ -155,10 +173,13 @@ class _MyPageViewState extends State<_MyPageView> {
         const SizedBox(height: 14),
         _buildPresetButtons(notifier),
         const SizedBox(height: 14),
-        ...List.generate(_dayNames.length, (i) => Padding(
-          padding: const EdgeInsets.only(bottom: 10),
-          child: _buildDaySliderCard(i, notifier),
-        )),
+        ...List.generate(
+          _dayNames.length,
+          (i) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _buildDaySliderCard(i, notifier),
+          ),
+        ),
       ],
     );
   }
@@ -179,7 +200,11 @@ class _MyPageViewState extends State<_MyPageView> {
               color: kPrimary,
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.schedule_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.schedule_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -188,21 +213,30 @@ class _MyPageViewState extends State<_MyPageView> {
               children: [
                 const Text(
                   '주간 여유시간',
-                  style: TextStyle(fontSize: 12, color: kPrimary, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: kPrimary,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
                 const SizedBox(height: 2),
                 RichText(
                   text: TextSpan(
                     children: [
                       TextSpan(
-                        text: '${notifier.weeklyFreeHours.toInt()}',
+                        text: fmtHours(notifier.weeklyFreeHours),
                         style: const TextStyle(
-                          fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A),
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF1A1A1A),
                         ),
                       ),
                       const TextSpan(
-                        text: ' h/주',
-                        style: TextStyle(fontSize: 14, color: Color(0xFF555555)),
+                        text: '/주',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFF555555),
+                        ),
                       ),
                     ],
                   ),
@@ -215,7 +249,9 @@ class _MyPageViewState extends State<_MyPageView> {
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF555555),
               side: const BorderSide(color: Color(0xFFCCCCCC)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             child: const Text('초기화', style: TextStyle(fontSize: 13)),
@@ -227,9 +263,9 @@ class _MyPageViewState extends State<_MyPageView> {
 
   Widget _buildPresetButtons(PlanNotifier notifier) {
     final presets = [
-      ('적게 (2h/일)', 2.0),
-      ('보통 (4h/일)', 4.0),
-      ('많이 (6h/일)', 6.0),
+      ('적게 (02:00)', 2.0),
+      ('보통 (04:00)', 4.0),
+      ('많이 (06:00)', 6.0),
     ];
     return Row(
       children: presets.map((p) {
@@ -244,7 +280,9 @@ class _MyPageViewState extends State<_MyPageView> {
             style: OutlinedButton.styleFrom(
               foregroundColor: const Color(0xFF444444),
               side: const BorderSide(color: Color(0xFFDDDDDD)),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             ),
             child: Text(p.$1, style: const TextStyle(fontSize: 13)),
@@ -275,29 +313,24 @@ class _MyPageViewState extends State<_MyPageView> {
               Expanded(
                 child: Text(
                   _dayNames[index],
-                  style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
+                  style: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
               _StepButton(
                 icon: Icons.remove,
                 outlined: true,
-                onTap: () => notifier.setFreeHours(index, hours - 1),
+                onTap: () => notifier.setFreeHours(index, hours - 0.5),
               ),
               const SizedBox(width: 10),
-              RichText(
-                text: TextSpan(
-                  children: [
-                    TextSpan(
-                      text: '${hours.toInt()}',
-                      style: const TextStyle(
-                        fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF1A1A1A),
-                      ),
-                    ),
-                    const TextSpan(
-                      text: ' h',
-                      style: TextStyle(fontSize: 14, color: Color(0xFF555555)),
-                    ),
-                  ],
+              Text(
+                fmtHours(hours),
+                style: const TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF1A1A1A),
                 ),
               ),
               const SizedBox(width: 10),
@@ -305,7 +338,7 @@ class _MyPageViewState extends State<_MyPageView> {
                 icon: Icons.add,
                 filled: true,
                 color: kPrimary,
-                onTap: () => notifier.setFreeHours(index, hours + 1),
+                onTap: () => notifier.setFreeHours(index, hours + 0.5),
               ),
             ],
           ),
@@ -324,7 +357,7 @@ class _MyPageViewState extends State<_MyPageView> {
               value: hours,
               min: 0,
               max: 12,
-              divisions: 12,
+              divisions: 24,
               onChanged: (v) => notifier.setFreeHours(index, v),
             ),
           ),
@@ -333,9 +366,18 @@ class _MyPageViewState extends State<_MyPageView> {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
-                Text('0h', style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA))),
-                Text('6h', style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA))),
-                Text('12h', style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA))),
+                Text(
+                  '0h',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
+                ),
+                Text(
+                  '6h',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
+                ),
+                Text(
+                  '12h',
+                  style: TextStyle(fontSize: 11, color: Color(0xFFAAAAAA)),
+                ),
               ],
             ),
           ),
@@ -350,7 +392,11 @@ class _MyPageViewState extends State<_MyPageView> {
       children: [
         const Text(
           '프로젝트 설정',
-          style: TextStyle(fontSize: 13, color: Color(0xFF888888), fontWeight: FontWeight.w500),
+          style: TextStyle(
+            fontSize: 13,
+            color: Color(0xFF888888),
+            fontWeight: FontWeight.w500,
+          ),
         ),
         const SizedBox(height: 8),
         Container(
@@ -466,11 +512,12 @@ class _SettingRow extends StatelessWidget {
               child: Icon(icon, size: 16, color: const Color(0xFF555555)),
             ),
             const SizedBox(width: 12),
-            Expanded(
-              child: Text(label, style: const TextStyle(fontSize: 15)),
-            ),
+            Expanded(child: Text(label, style: const TextStyle(fontSize: 15))),
             if (trailing != null)
-              Text(trailing!, style: const TextStyle(fontSize: 13, color: Color(0xFF888888))),
+              Text(
+                trailing!,
+                style: const TextStyle(fontSize: 13, color: Color(0xFF888888)),
+              ),
             const SizedBox(width: 4),
             const Icon(Icons.chevron_right, size: 18, color: Color(0xFFBBBBBB)),
           ],
