@@ -34,6 +34,8 @@ enum MeasureType {
   final String subtitle;
 }
 
+enum PlanScheduleType { daily, weekdays, specific, floating }
+
 /// One snapshot of plan fields — created when a plan is first added or edited.
 class PlanVersion {
   final DateTime effectiveFrom; // this version applies from this date onwards
@@ -51,6 +53,26 @@ class PlanVersion {
     required this.target,
     List<int>? repeatDays,
   }) : repeatDays = repeatDays ?? [];
+
+  // repeatDays encoding:
+  //   []       = daily (매일)
+  //   [-1]     = floating (반복 없음, shows until done)
+  //   [1..7]   = weekdays (특정 요일, weekday numbers)
+  //   [>10000] = specific dates (특정일, YYYYMMDD ints)
+  PlanScheduleType get scheduleType {
+    if (repeatDays.isEmpty) return PlanScheduleType.daily;
+    if (repeatDays.length == 1 && repeatDays[0] == -1) return PlanScheduleType.floating;
+    if (repeatDays.any((d) => d > 10000)) return PlanScheduleType.specific;
+    return PlanScheduleType.weekdays;
+  }
+
+  List<DateTime> get specificDates => repeatDays
+      .where((d) => d > 10000)
+      .map((d) => DateTime(d ~/ 10000, (d % 10000) ~/ 100, d % 100))
+      .toList()
+        ..sort();
+
+  static int dateToInt(DateTime dt) => dt.year * 10000 + dt.month * 100 + dt.day;
 }
 
 /// Persistent plan definition stored in Hive.
@@ -86,8 +108,15 @@ class PlanRecord {
     if (endDate != null && !d.isBefore(endDate!)) return false;
     final v = versionForDate(d);
     if (v == null) return false;
-    if (v.repeatDays.isEmpty) return true;
-    return v.repeatDays.contains(d.weekday);
+    switch (v.scheduleType) {
+      case PlanScheduleType.daily:
+      case PlanScheduleType.floating:
+        return true;
+      case PlanScheduleType.weekdays:
+        return v.repeatDays.contains(d.weekday);
+      case PlanScheduleType.specific:
+        return v.repeatDays.contains(PlanVersion.dateToInt(d));
+    }
   }
 }
 
@@ -117,6 +146,19 @@ class Plan {
         createdDate = _dateOnly(createdDate ?? DateTime.now());
 
   static DateTime _dateOnly(DateTime dt) => DateTime(dt.year, dt.month, dt.day);
+
+  PlanScheduleType get scheduleType {
+    if (repeatDays.isEmpty) return PlanScheduleType.daily;
+    if (repeatDays.length == 1 && repeatDays[0] == -1) return PlanScheduleType.floating;
+    if (repeatDays.any((d) => d > 10000)) return PlanScheduleType.specific;
+    return PlanScheduleType.weekdays;
+  }
+
+  List<DateTime> get specificDates => repeatDays
+      .where((d) => d > 10000)
+      .map((d) => DateTime(d ~/ 10000, (d % 10000) ~/ 100, d % 100))
+      .toList()
+        ..sort();
 
   double get progress {
     if (measureType == MeasureType.check) return isCompleted ? 1.0 : 0.0;

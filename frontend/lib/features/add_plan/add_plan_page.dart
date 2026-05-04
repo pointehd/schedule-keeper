@@ -24,7 +24,9 @@ class _AddPlanPageState extends State<AddPlanPage> {
   PlanCategory _category = PlanCategory.study;
   MeasureType _measureType = MeasureType.time;
   double _target = 30;
+  PlanScheduleType _scheduleMode = PlanScheduleType.daily;
   final Set<int> _repeatDays = {};
+  final List<DateTime> _specificDates = [];
 
   static const _weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
 
@@ -42,19 +44,32 @@ class _AddPlanPageState extends State<AddPlanPage> {
       _category = PlanCategory.study;
       _measureType = MeasureType.time;
       _target = 30;
+      _scheduleMode = PlanScheduleType.daily;
       _repeatDays.clear();
+      _specificDates.clear();
     });
   }
 
   void _save() {
     if (!_canSave) return;
+    final List<int> encodedRepeat;
+    switch (_scheduleMode) {
+      case PlanScheduleType.daily:
+        encodedRepeat = [];
+      case PlanScheduleType.floating:
+        encodedRepeat = [-1];
+      case PlanScheduleType.weekdays:
+        encodedRepeat = _repeatDays.toList()..sort();
+      case PlanScheduleType.specific:
+        encodedRepeat = _specificDates.map(PlanVersion.dateToInt).toList()..sort();
+    }
     context.read<PlanNotifier>().addPlan(Plan(
           id: DateTime.now().millisecondsSinceEpoch.toString(),
           name: _nameCtrl.text.trim(),
           category: _category,
           measureType: _measureType,
           target: _target,
-          repeatDays: _repeatDays.toList()..sort(),
+          repeatDays: encodedRepeat,
           createdDate: DateTime.now(),
         ));
     _reset();
@@ -316,83 +331,186 @@ class _AddPlanPageState extends State<AddPlanPage> {
                     ),
                   ],
                   const SizedBox(height: 20),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _SectionLabel('반복 요일'),
-                      const Text('선택하지 않으면 매일 반복됩니다',
-                          style: TextStyle(
-                              fontSize: 11, color: Color(0xFF888888))),
-                    ],
-                  ),
+                  _SectionLabel('일정'),
                   const SizedBox(height: 8),
                   _Card(
                     child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: List.generate(7, (i) {
-                            final day = i + 1;
-                            final sel = _repeatDays.contains(day);
-                            return GestureDetector(
-                              onTap: () => setState(() => sel
-                                  ? _repeatDays.remove(day)
-                                  : _repeatDays.add(day)),
-                              child: Container(
-                                width: 36,
-                                height: 36,
-                                decoration: BoxDecoration(
-                                  color: sel
-                                      ? kPrimary
-                                      : const Color(0xFFF5F5F5),
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    _weekdayLabels[i],
-                                    style: TextStyle(
-                                      fontSize: 13,
-                                      color: sel
-                                          ? Colors.white
-                                          : const Color(0xFF555555),
-                                      fontWeight: sel
-                                          ? FontWeight.w600
-                                          : FontWeight.normal,
+                          children: [
+                            PlanScheduleType.daily,
+                            PlanScheduleType.weekdays,
+                            PlanScheduleType.specific,
+                            PlanScheduleType.floating,
+                          ].asMap().entries.map((e) {
+                            final mode = e.value;
+                            final sel = mode == _scheduleMode;
+                            final isLast = e.key == 3;
+                            final label = switch (mode) {
+                              PlanScheduleType.daily => '매일',
+                              PlanScheduleType.weekdays => '특정 요일',
+                              PlanScheduleType.specific => '특정일',
+                              PlanScheduleType.floating => '반복 없음',
+                            };
+                            return Expanded(
+                              child: GestureDetector(
+                                onTap: () => setState(() => _scheduleMode = mode),
+                                child: Container(
+                                  margin: isLast ? EdgeInsets.zero : const EdgeInsets.only(right: 6),
+                                  padding: const EdgeInsets.symmetric(vertical: 9),
+                                  decoration: BoxDecoration(
+                                    color: sel ? kPrimary : const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      label,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: sel ? Colors.white : const Color(0xFF555555),
+                                        fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                                      ),
                                     ),
                                   ),
                                 ),
                               ),
                             );
-                          }),
+                          }).toList(),
                         ),
-                        const SizedBox(height: 10),
-                        Row(
-                          children: [
-                            _QuickDayBtn(
-                              label: '평일',
-                              onTap: () => setState(() {
-                                _repeatDays
-                                  ..clear()
-                                  ..addAll([1, 2, 3, 4, 5]);
-                              }),
-                            ),
-                            const SizedBox(width: 8),
-                            _QuickDayBtn(
-                              label: '주말',
-                              onTap: () => setState(() {
-                                _repeatDays
-                                  ..clear()
-                                  ..addAll([6, 7]);
-                              }),
-                            ),
-                            const SizedBox(width: 8),
-                            _QuickDayBtn(
-                              label: '매일',
-                              onTap: () =>
-                                  setState(() => _repeatDays.clear()),
-                            ),
-                          ],
-                        ),
+                        if (_scheduleMode == PlanScheduleType.weekdays) ...[
+                          const SizedBox(height: 12),
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceAround,
+                            children: List.generate(7, (i) {
+                              final day = i + 1;
+                              final sel = _repeatDays.contains(day);
+                              return GestureDetector(
+                                onTap: () => setState(() =>
+                                    sel ? _repeatDays.remove(day) : _repeatDays.add(day)),
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: sel ? kPrimary : const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(10),
+                                  ),
+                                  child: Center(
+                                    child: Text(
+                                      _weekdayLabels[i],
+                                      style: TextStyle(
+                                        fontSize: 13,
+                                        color: sel ? Colors.white : const Color(0xFF555555),
+                                        fontWeight: sel ? FontWeight.w600 : FontWeight.normal,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              _QuickDayBtn(
+                                label: '평일',
+                                onTap: () => setState(() {
+                                  _repeatDays..clear()..addAll([1, 2, 3, 4, 5]);
+                                }),
+                              ),
+                              const SizedBox(width: 8),
+                              _QuickDayBtn(
+                                label: '주말',
+                                onTap: () => setState(() {
+                                  _repeatDays..clear()..addAll([6, 7]);
+                                }),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (_scheduleMode == PlanScheduleType.specific) ...[
+                          const SizedBox(height: 12),
+                          Wrap(
+                            spacing: 8,
+                            runSpacing: 8,
+                            children: [
+                              ..._specificDates.map((d) => GestureDetector(
+                                    onTap: () => setState(() => _specificDates.remove(d)),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: kPrimary.withValues(alpha: 0.1),
+                                        borderRadius: BorderRadius.circular(20),
+                                        border: Border.all(color: kPrimary),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            '${d.month}/${d.day}',
+                                            style: const TextStyle(
+                                                fontSize: 12,
+                                                color: kPrimary,
+                                                fontWeight: FontWeight.w600),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          const Icon(Icons.close,
+                                              size: 12, color: kPrimary),
+                                        ],
+                                      ),
+                                    ),
+                                  )),
+                              GestureDetector(
+                                onTap: () async {
+                                  final now = DateTime.now();
+                                  final picked = await showDatePicker(
+                                    context: context,
+                                    initialDate: now,
+                                    firstDate: now.subtract(const Duration(days: 365)),
+                                    lastDate: now.add(const Duration(days: 365 * 2)),
+                                  );
+                                  if (picked != null) {
+                                    final d = DateTime(picked.year, picked.month, picked.day);
+                                    if (!_specificDates.any((x) =>
+                                        x.year == d.year &&
+                                        x.month == d.month &&
+                                        x.day == d.day)) {
+                                      setState(() => _specificDates.add(d));
+                                    }
+                                  }
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 12, vertical: 6),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xFFF5F5F5),
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: const Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Icon(Icons.add,
+                                          size: 14, color: Color(0xFF888888)),
+                                      SizedBox(width: 4),
+                                      Text('날짜 추가',
+                                          style: TextStyle(
+                                              fontSize: 12,
+                                              color: Color(0xFF888888))),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                        if (_scheduleMode == PlanScheduleType.floating) ...[
+                          const SizedBox(height: 10),
+                          const Text(
+                            '목표를 달성할 때까지 매일 할일로 표시됩니다',
+                            style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
+                          ),
+                        ],
                       ],
                     ),
                   ),

@@ -354,62 +354,50 @@ class _SelectedDayDetail extends StatelessWidget {
                     itemCount: plans.length,
                     itemBuilder: (context, i) {
                       final plan = plans[i];
-                      return GestureDetector(
-                        onLongPress: () =>
-                            _showPlanOptions(context, plan, notifier),
-                        child: Container(
-                          margin: const EdgeInsets.only(bottom: 8),
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(12)),
-                          child: Row(
-                            children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 200),
-                                width: 20,
-                                height: 20,
-                                decoration: BoxDecoration(
-                                  color: plan.isDone ? kPrimary : Colors.white,
-                                  borderRadius: BorderRadius.circular(6),
-                                  border: Border.all(
-                                      color: plan.isDone
-                                          ? kPrimary
-                                          : const Color(0xFFCCCCCC)),
-                                ),
-                                child: plan.isDone
-                                    ? const Icon(Icons.check,
-                                        color: Colors.white, size: 14)
-                                    : null,
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(12)),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 4,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: plan.category.color,
+                                borderRadius: BorderRadius.circular(2),
                               ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(plan.name,
-                                        style: const TextStyle(
-                                            fontSize: 13,
-                                            fontWeight: FontWeight.w500)),
-                                    Text(
-                                      '${plan.category.label} · ${plan.shortProgressLabel}',
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(plan.name,
                                       style: const TextStyle(
-                                          fontSize: 11,
-                                          color: Color(0xFF888888)),
-                                    ),
-                                  ],
-                                ),
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w500)),
+                                  Text(
+                                    '${plan.category.label} · ${plan.shortProgressLabel}',
+                                    style: const TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF888888)),
+                                  ),
+                                ],
                               ),
-                              Container(
-                                width: 4,
-                                height: 32,
-                                decoration: BoxDecoration(
-                                  color: plan.category.color,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
+                            ),
+                            GestureDetector(
+                              onTap: () =>
+                                  _showPlanOptions(context, plan, notifier),
+                              child: const Padding(
+                                padding: EdgeInsets.only(left: 8),
+                                child: Icon(Icons.edit_outlined,
+                                    size: 18, color: Color(0xFFBBBBBB)),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       );
                     },

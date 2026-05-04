@@ -51,6 +51,12 @@ class PlanNotifier extends ChangeNotifier {
     for (final record in _planBox.values) {
       if (!record.appliesOnDate(d)) continue;
       final v = record.versionForDate(d)!;
+
+      if (v.scheduleType == PlanScheduleType.floating) {
+        final completionDay = _getFloatingCompletionDay(record.id, v);
+        if (completionDay != null && d.isAfter(completionDay)) continue;
+      }
+
       final prog = _progressFor(record.id, d);
       result.add(Plan(
         id: record.id,
@@ -65,6 +71,24 @@ class PlanNotifier extends ChangeNotifier {
       ));
     }
     return result;
+  }
+
+  /// For floating plans: find the earliest day where the goal was met.
+  DateTime? _getFloatingCompletionDay(String planId, PlanVersion v) {
+    DateTime? earliest;
+    for (final key in _progressBox.keys.cast<String>()) {
+      if (!key.startsWith('${planId}_')) continue;
+      final prog = _progressBox.get(key);
+      if (prog == null) continue;
+      final done = v.measureType == MeasureType.check
+          ? prog.isCompleted
+          : v.target > 0 && prog.current >= v.target;
+      if (done) {
+        final d = _dateOnly(prog.date);
+        if (earliest == null || d.isBefore(earliest)) earliest = d;
+      }
+    }
+    return earliest;
   }
 
   List<Plan> get plans => plansForDate(DateTime.now());
