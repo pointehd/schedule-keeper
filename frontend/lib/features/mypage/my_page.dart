@@ -3,11 +3,8 @@ import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
 import '../../shared/models/plan.dart';
 import '../../shared/widgets/page_header.dart';
+import '../../shared/theme/app_colors.dart';
 import 'login_page.dart';
-
-const Color kPrimary = Color(0xFF5B5FC7);
-const Color kWeekend = Color(0xFFD4873A);
-const Color kBg = Color(0xFFF2F3F8);
 
 class MyPage extends StatelessWidget {
   const MyPage({super.key});

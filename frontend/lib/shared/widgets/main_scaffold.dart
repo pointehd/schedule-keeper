@@ -4,8 +4,7 @@ import '../../features/plan/plan_page.dart';
 import '../../features/calendar/calendar_page.dart';
 import '../../features/mypage/my_page.dart';
 import '../../features/add_plan/add_plan_page.dart';
-
-const Color kPrimary = Color(0xFF5B5FC7);
+import '../../shared/theme/app_colors.dart';
 
 class MainScaffold extends StatefulWidget {
   const MainScaffold({super.key});

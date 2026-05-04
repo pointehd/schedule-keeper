@@ -4,8 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../../shared/models/plan.dart';
 import '../../../shared/providers/plan_provider.dart';
-
-const Color kPrimary = Color(0xFF5B5FC7);
+import '../../../shared/theme/app_colors.dart';
 
 class PlanCard extends StatefulWidget {
   final Plan plan;

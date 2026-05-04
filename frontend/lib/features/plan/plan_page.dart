@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
 import '../../shared/widgets/page_header.dart';
+import '../../shared/theme/app_colors.dart';
 import 'widgets/plan_card.dart';
-
-const Color kPrimary = Color(0xFF5B5FC7);
 
 class PlanPage extends StatefulWidget {
   final String? focusedPlanId;

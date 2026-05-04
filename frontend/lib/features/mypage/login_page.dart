@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
-
-const Color _kPrimary = Color(0xFF5B5FC7);
+import '../../shared/theme/app_colors.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -50,7 +49,7 @@ class LoginPage extends StatelessWidget {
       child: const Icon(
         Icons.person_outline_rounded,
         size: 52,
-        color: _kPrimary,
+        color: kPrimary,
       ),
     );
   }

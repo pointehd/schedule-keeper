@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/models/plan.dart';
 import '../../shared/providers/plan_provider.dart';
-
-const Color kPrimary = Color(0xFF5B5FC7);
+import '../../shared/utils/plan_color_utils.dart';
+import '../../shared/theme/app_colors.dart';
 
 class HomePage extends StatelessWidget {
   final void Function(String planId)? onNavigateToPlan;
@@ -259,20 +259,8 @@ class _WeeklyView extends StatelessWidget {
   static const double _maxBarHeight = 64.0;
   static const double _minBarHeight = 8.0;
 
-  Color? _barColor(DateTime date, DateTime today) {
-    if (date.isAfter(today)) return null;
-    final plans = notifier.plansForDate(date);
-    if (plans.isEmpty) return null;
-
-    final freeHours = notifier.freeHoursForDate(date);
-    final focusHours = notifier.focusHoursForDate(date);
-    final completionRate = notifier.completedCountForDate(date) / plans.length;
-
-    if (freeHours > 0 && focusHours > freeHours) return kPrimary;
-    if (freeHours > 0 && focusHours < freeHours * 0.2) return const Color(0xFFFF3B30);
-    if (completionRate >= 0.8) return const Color(0xFF34C759);
-    return const Color(0xFFFF9500);
-  }
+  Color? _barColor(DateTime date, DateTime today) =>
+      dayProgressColor(date, today, notifier);
 
   @override
   Widget build(BuildContext context) {
