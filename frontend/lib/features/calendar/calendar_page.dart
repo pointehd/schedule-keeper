@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
 import '../../shared/models/plan.dart';
+import '../../shared/widgets/page_header.dart';
 import '../edit_plan/edit_plan_page.dart';
 
 const Color kPrimary = Color(0xFF5B5FC7);
@@ -33,23 +34,15 @@ class _CalendarPageState extends State<CalendarPage> {
       body: SafeArea(
         child: Column(
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(
-                children: [
-                  const Text('캘린더',
-                      style: TextStyle(
-                          fontSize: 22, fontWeight: FontWeight.bold)),
-                  const Spacer(),
-                  GestureDetector(
-                    onTap: () => setState(() {
-                      _selectedDay = DateTime.now();
-                      _focusedMonth = DateTime.now();
-                    }),
-                    child: const Icon(Icons.today_outlined,
-                        color: Color(0xFF888888)),
-                  ),
-                ],
+            PageHeader(
+              title: '캘린더',
+              trailing: GestureDetector(
+                onTap: () => setState(() {
+                  _selectedDay = DateTime.now();
+                  _focusedMonth = DateTime.now();
+                }),
+                child: const Icon(Icons.today_outlined,
+                    color: Color(0xFF888888)),
               ),
             ),
             const SizedBox(height: 16),
@@ -80,10 +73,25 @@ class _CalendarPageState extends State<CalendarPage> {
                                   fontSize: 16,
                                   fontWeight: FontWeight.bold),
                             ),
-                            const Text('이번 달 70회 달성',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: Color(0xFF888888))),
+                            Builder(builder: (_) {
+                              final pct = _monthlyAdherencePct(notifier);
+                              if (pct == null) {
+                                return const Text('기록 없음',
+                                    style: TextStyle(
+                                        fontSize: 11,
+                                        color: Color(0xFF888888)));
+                              }
+                              final color = pct >= 80
+                                  ? const Color(0xFF34C759)
+                                  : pct >= 50
+                                      ? const Color(0xFFFF9500)
+                                      : const Color(0xFFFF3B30);
+                              return Text('달성률 $pct%',
+                                  style: TextStyle(
+                                      fontSize: 11,
+                                      color: color,
+                                      fontWeight: FontWeight.w600));
+                            }),
                           ],
                         ),
                         GestureDetector(
@@ -241,6 +249,30 @@ class _CalendarPageState extends State<CalendarPage> {
 
   bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
+
+  // 해당 월의 경과일 기준 계획 달성률 (0~100 정수, 계획 없으면 null)
+  int? _monthlyAdherencePct(PlanNotifier notifier) {
+    final now = DateTime.now();
+    final isCurrentMonth =
+        _focusedMonth.year == now.year && _focusedMonth.month == now.month;
+    final lastDay = isCurrentMonth
+        ? now.day
+        : DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0).day;
+
+    int daysWithPlans = 0;
+    double totalRate = 0;
+
+    for (int d = 1; d <= lastDay; d++) {
+      final date = DateTime(_focusedMonth.year, _focusedMonth.month, d);
+      final plans = notifier.plansForDate(date);
+      if (plans.isEmpty) continue;
+      totalRate += notifier.completedCountForDate(date) / plans.length;
+      daysWithPlans++;
+    }
+
+    if (daysWithPlans == 0) return null;
+    return (totalRate / daysWithPlans * 100).round();
+  }
 }
 
 class _SelectedDayDetail extends StatelessWidget {
@@ -297,49 +329,49 @@ class _SelectedDayDetail extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          GestureDetector(
-            onLongPress: isPast ? null : () => _showFreeTimeEditor(context, selectedDay, freeH, notifier),
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(12)),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Text('여유시간 사용',
-                            style: TextStyle(
-                                fontSize: 13, color: Color(0xFF555555))),
-                      ),
-                      Text(
-                        '${fmtHours(usedH)} / ${fmtHours(freeH)}',
-                        style: TextStyle(
-                            fontSize: 13,
-                            color: isOver ? kPrimary : const Color(0xFF888888),
-                            fontWeight: isOver ? FontWeight.w600 : FontWeight.normal),
-                      ),
-                      if (!isPast) ...[
-                        const SizedBox(width: 6),
-                        const Icon(Icons.edit_outlined,
-                            size: 13, color: Color(0xFFCCCCCC)),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      backgroundColor: const Color(0xFFF0F0F0),
-                      valueColor: const AlwaysStoppedAnimation(kPrimary),
-                      minHeight: 6,
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(12)),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Expanded(
+                      child: Text('여유시간 사용',
+                          style: TextStyle(
+                              fontSize: 13, color: Color(0xFF555555))),
                     ),
+                    Text(
+                      '${fmtHours(usedH)} / ${fmtHours(freeH)}',
+                      style: TextStyle(
+                          fontSize: 13,
+                          color: isOver ? kPrimary : const Color(0xFF888888),
+                          fontWeight: isOver ? FontWeight.w600 : FontWeight.normal),
+                    ),
+                    if (!isPast) ...[
+                      const SizedBox(width: 6),
+                      GestureDetector(
+                        onTap: () => _showFreeTimeEditor(context, selectedDay, freeH, notifier),
+                        child: const Icon(Icons.edit_outlined,
+                            size: 13, color: Color(0xFFCCCCCC)),
+                      ),
+                    ],
+                  ],
+                ),
+                const SizedBox(height: 6),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(4),
+                  child: LinearProgressIndicator(
+                    value: progress,
+                    backgroundColor: const Color(0xFFF0F0F0),
+                    valueColor: const AlwaysStoppedAnimation(kPrimary),
+                    minHeight: 6,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 8),

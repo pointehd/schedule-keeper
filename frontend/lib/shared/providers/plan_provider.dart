@@ -9,6 +9,7 @@ const _kTimerStartMs = 'timer_start_ms';
 const _kFreeHoursLegacy = 'free_hours';
 const _kFreeHoursInitKey = '19700101';
 const _kFirstOpenDate = 'first_open_date_ms';
+const _kUserName = 'user_name';
 
 class PlanNotifier extends ChangeNotifier {
   PlanNotifier() {
@@ -25,6 +26,7 @@ class PlanNotifier extends ChangeNotifier {
   String? _activeTimerId;
   DateTime? _timerStartedAt;
   Timer? _ticker;
+  String? _userName;
 
   // ── helpers ───────────────────────────────────────────────
 
@@ -177,6 +179,21 @@ class PlanNotifier extends ChangeNotifier {
   }
 
   double get todayFreeHours => freeHoursForDate(DateTime.now());
+
+  bool get isLoggedIn => _userName != null;
+  String? get userName => _userName;
+
+  void login(String name) {
+    _userName = name.trim().isEmpty ? null : name.trim();
+    _prefs?.setString(_kUserName, _userName ?? '');
+    notifyListeners();
+  }
+
+  void logout() {
+    _userName = null;
+    _prefs?.remove(_kUserName);
+    notifyListeners();
+  }
 
   bool isTimerActive(String id) => _activeTimerId == id;
 
@@ -366,14 +383,43 @@ class PlanNotifier extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Calendar long-press: change a single weekday slot only for [date]'s snapshot.
+  /// Finds the most recent snapshot whose effectiveFrom is strictly before [date].
+  FreeHoursSnapshot? _snapshotBeforeDate(DateTime date) {
+    final d = _dateOnly(date);
+    FreeHoursSnapshot? result;
+    for (final snap in _freeHoursBox.values) {
+      if (snap.effectiveFrom.isBefore(d)) {
+        if (result == null || snap.effectiveFrom.isAfter(result.effectiveFrom)) {
+          result = snap;
+        }
+      }
+    }
+    return result;
+  }
+
+  /// Calendar edit: change free hours only for [date], without affecting future dates.
   void setFreeHoursForDate(DateTime date, int index, double hours) {
     if (index < 0 || index >= 7) return;
     final d = _dateOnly(date);
     final key = _freeHoursKey(d);
-    final base = List<double>.from(_snapshotForDate(d)?.hours ?? _defaultHours);
+
+    final currentSnap = _snapshotForDate(d);
+    // Hours to continue into future: use the snapshot before d if we're replacing d's own snapshot.
+    final continuationHours = (currentSnap != null && currentSnap.effectiveFrom == d)
+        ? List<double>.from(_snapshotBeforeDate(d)?.hours ?? _defaultHours)
+        : List<double>.from(currentSnap?.hours ?? _defaultHours);
+
+    final base = List<double>.from(currentSnap?.hours ?? _defaultHours);
     base[index] = hours.clamp(0, 12);
     _freeHoursBox.put(key, FreeHoursSnapshot(effectiveFrom: d, hours: base));
+
+    // Protect future dates: anchor d+1 with the pre-edit default so they aren't affected.
+    final nextDay = d.add(const Duration(days: 1));
+    final nextKey = _freeHoursKey(nextDay);
+    if (!_freeHoursBox.containsKey(nextKey)) {
+      _freeHoursBox.put(nextKey, FreeHoursSnapshot(effectiveFrom: nextDay, hours: continuationHours));
+    }
+
     notifyListeners();
   }
 
@@ -453,6 +499,9 @@ class PlanNotifier extends ChangeNotifier {
     }
 
     _fillMissingDays();
+
+    final savedName = _prefs?.getString(_kUserName);
+    if (savedName != null && savedName.isNotEmpty) _userName = savedName;
 
     final id = _prefs?.getString(_kTimerId);
     final startMs = _prefs?.getInt(_kTimerStartMs);

@@ -7,7 +7,8 @@ import '../../shared/providers/plan_provider.dart';
 const Color kPrimary = Color(0xFF5B5FC7);
 
 class HomePage extends StatelessWidget {
-  const HomePage({super.key});
+  final void Function(String planId)? onNavigateToPlan;
+  const HomePage({super.key, this.onNavigateToPlan});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +53,7 @@ class HomePage extends StatelessWidget {
               const SizedBox(height: 16),
               _ProgressCard(notifier: notifier),
               const SizedBox(height: 20),
-              _WeeklyView(now: now, weekStart: weekStart),
+              _WeeklyView(now: now, weekStart: weekStart, notifier: notifier),
               const SizedBox(height: 20),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -65,17 +66,28 @@ class HomePage extends StatelessWidget {
                       color: Color(0xFF1A1A1A),
                     ),
                   ),
-                  TextButton(
+                  TextButton.icon(
                     onPressed: () {},
-                    child: const Text(
-                      '전체 >',
+                    label: const Text(
+                      '전체',
                       style: TextStyle(color: kPrimary, fontSize: 14),
                     ),
+                    icon: const Icon(
+                      Icons.chevron_right,
+                      color: kPrimary,
+                      size: 18,
+                    ),
+                    iconAlignment: IconAlignment.end,
                   ),
                 ],
               ),
               const SizedBox(height: 4),
-              ...notifier.plans.map((p) => _PlanListTile(plan: p)),
+              ...notifier.plans.map((p) => _PlanListTile(
+                    plan: p,
+                    onTap: onNavigateToPlan != null
+                        ? () => onNavigateToPlan!(p.id)
+                        : null,
+                  )),
               const SizedBox(height: 80),
             ],
           ),
@@ -236,8 +248,31 @@ class _CircularGaugePainter extends CustomPainter {
 class _WeeklyView extends StatelessWidget {
   final DateTime now;
   final DateTime weekStart;
+  final PlanNotifier notifier;
 
-  const _WeeklyView({required this.now, required this.weekStart});
+  const _WeeklyView({
+    required this.now,
+    required this.weekStart,
+    required this.notifier,
+  });
+
+  static const double _maxBarHeight = 64.0;
+  static const double _minBarHeight = 8.0;
+
+  Color? _barColor(DateTime date, DateTime today) {
+    if (date.isAfter(today)) return null;
+    final plans = notifier.plansForDate(date);
+    if (plans.isEmpty) return null;
+
+    final freeHours = notifier.freeHoursForDate(date);
+    final focusHours = notifier.focusHoursForDate(date);
+    final completionRate = notifier.completedCountForDate(date) / plans.length;
+
+    if (freeHours > 0 && focusHours > freeHours) return kPrimary;
+    if (freeHours > 0 && focusHours < freeHours * 0.2) return const Color(0xFFFF3B30);
+    if (completionRate >= 0.8) return const Color(0xFF34C759);
+    return const Color(0xFFFF9500);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -267,37 +302,78 @@ class _WeeklyView extends StatelessWidget {
         const SizedBox(height: 12),
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: List.generate(7, (i) {
             final date = weekStart.add(Duration(days: i));
             final isToday = date.year == today.year &&
                 date.month == today.month &&
                 date.day == today.day;
-            final isPast = date.isBefore(today);
-            final isCompleted = isPast && i != 2;
+            final isFuture = date.isAfter(today);
+
+            final plans = notifier.plansForDate(date);
+            final hasPlans = plans.isNotEmpty;
+
+            double completionRate = 0;
+            if (!isFuture && hasPlans) {
+              final done = notifier.completedCountForDate(date);
+              completionRate = done / plans.length;
+            }
+
+            final color = isToday
+                ? (_barColor(date, today) ?? kPrimary)
+                : _barColor(date, today);
+
+            final isOver = !isFuture && hasPlans &&
+                notifier.freeHoursForDate(date) > 0 &&
+                notifier.focusHoursForDate(date) > notifier.freeHoursForDate(date);
+
+            final showCheck = !isFuture && hasPlans && (completionRate >= 1.0 || isOver);
+
+            final barHeight = (isFuture || !hasPlans)
+                ? _minBarHeight
+                : (completionRate.clamp(0.0, 1.0) * _maxBarHeight)
+                    .clamp(_minBarHeight, _maxBarHeight);
+
+            final barColor = color ?? const Color(0xFFE8EAF6);
 
             return Column(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Container(
+                SizedBox(
                   width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: isToday
-                        ? kPrimary
-                        : isCompleted
-                            ? const Color(0xFFE8EAF6)
-                            : Colors.white,
-                    borderRadius: BorderRadius.circular(12),
-                    border: isCompleted && !isToday
-                        ? Border.all(color: kPrimary.withValues(alpha: 0.3))
-                        : null,
+                  height: _maxBarHeight + 10,
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      alignment: Alignment.bottomCenter,
+                      children: [
+                        Container(
+                          width: 40,
+                          height: barHeight,
+                          decoration: BoxDecoration(
+                            color: barColor,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                        if (showCheck)
+                          Positioned(
+                            top: _maxBarHeight - barHeight - 8,
+                            right: -5,
+                            child: Container(
+                              width: 16,
+                              height: 16,
+                              decoration: BoxDecoration(
+                                color: color,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: Colors.white, width: 1.5),
+                              ),
+                              child: const Icon(Icons.check, size: 9, color: Colors.white),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
-                  child: isCompleted || isToday
-                      ? Icon(
-                          Icons.check,
-                          color: isToday ? Colors.white : kPrimary,
-                          size: 20,
-                        )
-                      : null,
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -305,8 +381,7 @@ class _WeeklyView extends StatelessWidget {
                   style: TextStyle(
                     fontSize: 12,
                     color: isToday ? kPrimary : const Color(0xFF888888),
-                    fontWeight:
-                        isToday ? FontWeight.w600 : FontWeight.normal,
+                    fontWeight: isToday ? FontWeight.w600 : FontWeight.normal,
                   ),
                 ),
               ],
@@ -320,46 +395,52 @@ class _WeeklyView extends StatelessWidget {
 
 class _PlanListTile extends StatelessWidget {
   final Plan plan;
-  const _PlanListTile({required this.plan});
+  final VoidCallback? onTap;
+  const _PlanListTile({required this.plan, this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 8,
-            height: 8,
-            decoration: BoxDecoration(
-              color: plan.category.color,
-              shape: BoxShape.circle,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 8,
+              height: 8,
+              decoration: BoxDecoration(
+                color: plan.category.color,
+                shape: BoxShape.circle,
+              ),
             ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              plan.name,
-              style:
-                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                plan.name,
+                style:
+                    const TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+              ),
             ),
-          ),
-          Text(
-            plan.shortProgressLabel,
-            style: TextStyle(
-              fontSize: 13,
-              color: plan.isDone
-                  ? const Color(0xFF34C759)
-                  : const Color(0xFF888888),
-              fontWeight: FontWeight.w500,
+            Text(
+              plan.shortProgressLabel,
+              style: TextStyle(
+                fontSize: 13,
+                color: plan.isDone
+                    ? const Color(0xFF34C759)
+                    : const Color(0xFF888888),
+                fontWeight: FontWeight.w500,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(width: 4),
+            const Icon(Icons.chevron_right, size: 16, color: Color(0xFFCCCCCC)),
+          ],
+        ),
       ),
     );
   }

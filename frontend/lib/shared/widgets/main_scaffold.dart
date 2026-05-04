@@ -17,6 +17,7 @@ class MainScaffold extends StatefulWidget {
 class _MainScaffoldState extends State<MainScaffold> {
   int _index = 0;      // 0=홈 1=계획 2=캘린더 3=내정보 4=새계획
   int _prevIndex = 0;  // 새계획 열기 직전 탭
+  String? _focusedPlanId;
 
   void _openAddPlan() {
     if (_index == 4) return;
@@ -30,6 +31,14 @@ class _MainScaffoldState extends State<MainScaffold> {
 
   void _onSaved() => setState(() => _index = 1);
 
+  void _navigateToPlan(String planId) {
+    setState(() {
+      _focusedPlanId = planId;
+      _prevIndex = 1;
+      _index = 1;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -37,8 +46,8 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: IndexedStack(
         index: _index,
         children: [
-          const HomePage(),
-          const PlanPage(),
+          HomePage(onNavigateToPlan: _navigateToPlan),
+          PlanPage(focusedPlanId: _focusedPlanId),
           const CalendarPage(),
           const MyPage(),
           AddPlanPage(
@@ -51,6 +60,7 @@ class _MainScaffoldState extends State<MainScaffold> {
         tabIndex: _index < 4 ? _index : -1,
         addPlanActive: _index == 4,
         onTap: (i) => setState(() {
+          if (i != 1) _focusedPlanId = null;
           _prevIndex = i;
           _index = i;
         }),

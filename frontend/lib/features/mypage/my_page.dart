@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../shared/providers/plan_provider.dart';
 import '../../shared/models/plan.dart';
+import '../../shared/widgets/page_header.dart';
+import 'login_page.dart';
 
 const Color kPrimary = Color(0xFF5B5FC7);
 const Color kWeekend = Color(0xFFD4873A);
@@ -63,7 +65,7 @@ class _MyPageViewState extends State<_MyPageView> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: 16),
-                    _buildProfileCard(),
+                    _buildProfileCard(notifier),
                     const SizedBox(height: 24),
                     _buildFreeTimeSection(notifier),
                     const SizedBox(height: 24),
@@ -79,28 +81,15 @@ class _MyPageViewState extends State<_MyPageView> {
   }
 
   Widget _buildAppBar(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          Align(
-            alignment: Alignment.centerLeft,
-            child: IconButton(
-              icon: const Icon(Icons.chevron_left, size: 28),
-              onPressed: () {},
-            ),
-          ),
-          const Text(
-            '설정',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600),
-          ),
-        ],
-      ),
-    );
+    return const PageHeader(title: '설정');
   }
 
-  Widget _buildProfileCard() {
+  Widget _buildProfileCard(PlanNotifier notifier) {
+    if (!notifier.isLoggedIn) {
+      return _buildLoginCard(notifier);
+    }
+    final name = notifier.userName!;
+    final initial = name.isNotEmpty ? name[0].toUpperCase() : '?';
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -112,9 +101,9 @@ class _MyPageViewState extends State<_MyPageView> {
           CircleAvatar(
             radius: 30,
             backgroundColor: kPrimary,
-            child: const Text(
-              'H',
-              style: TextStyle(
+            child: Text(
+              initial,
+              style: const TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.bold,
                 color: Colors.white,
@@ -122,16 +111,19 @@ class _MyPageViewState extends State<_MyPageView> {
             ),
           ),
           const SizedBox(width: 14),
-          const Expanded(
+          Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '하람',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                  name,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
-                SizedBox(height: 4),
-                Text(
+                const SizedBox(height: 4),
+                const Text(
                   '연속 12일 · 누적 134회 달성',
                   style: TextStyle(fontSize: 12, color: Color(0xFF888888)),
                 ),
@@ -154,6 +146,63 @@ class _MyPageViewState extends State<_MyPageView> {
       ),
     );
   }
+
+  Widget _buildLoginCard(PlanNotifier notifier) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          CircleAvatar(
+            radius: 30,
+            backgroundColor: const Color(0xFFE8E8E8),
+            child: const Icon(
+              Icons.person_outline,
+              size: 28,
+              color: Color(0xFFAAAAAA),
+            ),
+          ),
+          const SizedBox(width: 14),
+          const Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '로그인이 필요해요',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '로그인하면 데이터를 안전하게 보관할 수 있어요.',
+                  style: TextStyle(fontSize: 12, color: Color(0xFF888888), height: 1.4),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const LoginPage()),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: kPrimary,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(20),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            ),
+            child: const Text('로그인', style: TextStyle(fontSize: 13)),
+          ),
+        ],
+      ),
+    );
+  }
+
 
   Widget _buildFreeTimeSection(PlanNotifier notifier) {
     return Column(

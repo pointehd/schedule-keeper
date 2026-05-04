@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
@@ -6,18 +7,62 @@ import '../../../shared/providers/plan_provider.dart';
 
 const Color kPrimary = Color(0xFF5B5FC7);
 
-class PlanCard extends StatelessWidget {
+class PlanCard extends StatefulWidget {
   final Plan plan;
-  const PlanCard({super.key, required this.plan});
+  final bool isFocused;
+  const PlanCard({super.key, required this.plan, this.isFocused = false});
+
+  @override
+  State<PlanCard> createState() => _PlanCardState();
+}
+
+class _PlanCardState extends State<PlanCard> {
+  bool _highlight = false;
+  Timer? _blinkTimer;
+
+  @override
+  void didUpdateWidget(PlanCard old) {
+    super.didUpdateWidget(old);
+    if (widget.isFocused && !old.isFocused) {
+      _startBlink();
+    }
+  }
+
+  void _startBlink() {
+    _blinkTimer?.cancel();
+    int count = 0;
+    setState(() => _highlight = true);
+    _blinkTimer = Timer.periodic(const Duration(milliseconds: 500), (t) {
+      count++;
+      setState(() => _highlight = !_highlight);
+      if (count >= 6) {
+        t.cancel();
+        setState(() => _highlight = false);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _blinkTimer?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 250),
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
+        border: _highlight
+            ? Border.all(color: kPrimary, width: 2)
+            : Border.all(color: Colors.transparent, width: 2),
+        boxShadow: _highlight
+            ? [BoxShadow(color: kPrimary.withValues(alpha: 0.2), blurRadius: 12, offset: const Offset(0, 4))]
+            : null,
       ),
       child: switch (plan.measureType) {
         MeasureType.count => _CountCard(plan: plan),
@@ -26,6 +71,8 @@ class PlanCard extends StatelessWidget {
       },
     );
   }
+
+  Plan get plan => widget.plan;
 }
 
 class _CardHeader extends StatelessWidget {
