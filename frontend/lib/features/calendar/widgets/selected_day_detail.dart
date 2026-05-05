@@ -24,8 +24,9 @@ class SelectedDayDetail extends StatelessWidget {
     final progress = freeH > 0 ? (usedH / freeH).clamp(0.0, 1.0) : 0.0;
     final isOver = usedH > freeH;
     final today = DateTime.now();
-    final isPast = selectedDay
-        .isBefore(DateTime(today.year, today.month, today.day));
+    final todayDate = DateTime(today.year, today.month, today.day);
+    final isPast = selectedDay.isBefore(todayDate);
+    final isFuture = selectedDay.isAfter(todayDate);
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -41,21 +42,22 @@ class SelectedDayDetail extends StatelessWidget {
                       fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: kSuccess.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(20),
+              if (!isFuture)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: kSuccess.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    '$done/${plans.length} 달성',
+                    style: const TextStyle(
+                        fontSize: 12,
+                        color: kSuccess,
+                        fontWeight: FontWeight.w600),
+                  ),
                 ),
-                child: Text(
-                  '$done/${plans.length} 달성',
-                  style: const TextStyle(
-                      fontSize: 12,
-                      color: kSuccess,
-                      fontWeight: FontWeight.w600),
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),

@@ -44,6 +44,8 @@ class _MyPageViewState extends State<_MyPageView> {
     '일요일',
   ];
 
+  static String _weekdayLabel(int weekday) => _dayNames[(weekday - 1) % 7];
+
   bool _isWeekend(int index) => index >= 5;
 
   @override
@@ -66,7 +68,7 @@ class _MyPageViewState extends State<_MyPageView> {
                     const SizedBox(height: 24),
                     _buildFreeTimeSection(notifier),
                     const SizedBox(height: 24),
-                    _buildProjectSettings(),
+                    _buildProjectSettings(notifier),
                   ],
                 ),
               ),
@@ -432,7 +434,7 @@ class _MyPageViewState extends State<_MyPageView> {
     );
   }
 
-  Widget _buildProjectSettings() {
+  Widget _buildProjectSettings(PlanNotifier notifier) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -475,14 +477,53 @@ class _MyPageViewState extends State<_MyPageView> {
               _SettingRow(
                 icon: Icons.calendar_month_outlined,
                 label: '한 주 시작일',
-                trailing: '월요일',
-                onTap: () {},
+                trailing: _weekdayLabel(notifier.weekStartDay),
+                onTap: () => _pickWeekStartDay(context, notifier),
                 showBorder: false,
               ),
             ],
           ),
         ),
       ],
+    );
+  }
+
+  void _pickWeekStartDay(BuildContext context, PlanNotifier notifier) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return SafeArea(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 12),
+              const Text(
+                '한 주 시작일',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 8),
+              ...List.generate(7, (i) {
+                final day = i + 1; // 1=월 … 7=일
+                final isSelected = notifier.weekStartDay == day;
+                return ListTile(
+                  title: Text(_weekdayLabel(day)),
+                  trailing: isSelected
+                      ? const Icon(Icons.check, color: kPrimary)
+                      : null,
+                  onTap: () {
+                    notifier.setWeekStartDay(day);
+                    Navigator.pop(ctx);
+                  },
+                );
+              }),
+              const SizedBox(height: 8),
+            ],
+          ),
+        );
+      },
     );
   }
 }

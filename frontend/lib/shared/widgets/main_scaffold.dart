@@ -45,8 +45,8 @@ class _MainScaffoldState extends State<MainScaffold> {
       body: IndexedStack(
         index: _index,
         children: [
-          HomePage(onNavigateToPlan: _navigateToPlan),
-          PlanPage(focusedPlanId: _focusedPlanId),
+          HomePage(onNavigateToPlan: _navigateToPlan, onAddPlan: _openAddPlan),
+          PlanPage(focusedPlanId: _focusedPlanId, onAddPlan: _openAddPlan),
           const CalendarPage(),
           const MyPage(),
           AddPlanPage(

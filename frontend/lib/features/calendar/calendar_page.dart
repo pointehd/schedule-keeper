@@ -20,9 +20,8 @@ class _CalendarPageState extends State<CalendarPage> {
   int get _daysInMonth =>
       DateTime(_focusedMonth.year, _focusedMonth.month + 1, 0).day;
 
-  // Sunday-first: Sun=0, Mon=1, … Sat=6  (DateTime.weekday: Mon=1…Sun=7)
-  int get _firstWeekday =>
-      DateTime(_focusedMonth.year, _focusedMonth.month, 1).weekday % 7;
+  int _firstWeekdayFor(int weekStartDay) =>
+      (DateTime(_focusedMonth.year, _focusedMonth.month, 1).weekday - weekStartDay + 7) % 7;
 
   @override
   Widget build(BuildContext context) {
@@ -103,28 +102,32 @@ class _CalendarPageState extends State<CalendarPage> {
                       ],
                     ),
                     const SizedBox(height: 12),
-                    Row(
-                      children: ['일', '월', '화', '수', '목', '금', '토']
-                          .asMap()
-                          .entries
-                          .map((e) => Expanded(
-                                child: Center(
-                                  child: Text(
-                                    e.value,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w500,
-                                      color: e.key == 0
-                                          ? kDanger
-                                          : e.key == 6
-                                              ? const Color(0xFF2979FF)
-                                              : const Color(0xFF888888),
-                                    ),
-                                  ),
+                    Builder(builder: (_) {
+                      // allLabels: index 0=일(Sun), 1=월(Mon), …, 6=토(Sat)
+                      const allLabels = ['일', '월', '화', '수', '목', '금', '토'];
+                      final startIdx = notifier.weekStartDay % 7; // 1→1, 7→0
+                      return Row(
+                        children: List.generate(7, (i) {
+                          final idx = (startIdx + i) % 7;
+                          return Expanded(
+                            child: Center(
+                              child: Text(
+                                allLabels[idx],
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w500,
+                                  color: idx == 0
+                                      ? kDanger
+                                      : idx == 6
+                                          ? const Color(0xFF2979FF)
+                                          : const Color(0xFF888888),
                                 ),
-                              ))
-                          .toList(),
-                    ),
+                              ),
+                            ),
+                          );
+                        }),
+                      );
+                    }),
                     const SizedBox(height: 8),
                     _buildGrid(notifier),
                   ],
@@ -143,7 +146,7 @@ class _CalendarPageState extends State<CalendarPage> {
   }
 
   Widget _buildGrid(PlanNotifier notifier) {
-    final offset = _firstWeekday;
+    final offset = _firstWeekdayFor(notifier.weekStartDay);
     final total = offset + _daysInMonth;
     final rows = (total / 7).ceil();
     final now = DateTime.now();

@@ -8,13 +8,15 @@ import '../../shared/theme/app_colors.dart';
 
 class HomePage extends StatelessWidget {
   final void Function(String planId)? onNavigateToPlan;
-  const HomePage({super.key, this.onNavigateToPlan});
+  final VoidCallback? onAddPlan;
+  const HomePage({super.key, this.onNavigateToPlan, this.onAddPlan});
 
   @override
   Widget build(BuildContext context) {
     final notifier = context.watch<PlanNotifier>();
     final now = DateTime.now();
-    final weekStart = now.subtract(Duration(days: now.weekday - 1));
+    final wsd = notifier.weekStartDay; // 1=월 … 7=일
+    final weekStart = now.subtract(Duration(days: (now.weekday - wsd + 7) % 7));
 
     return Scaffold(
       backgroundColor: const Color(0xFFF2F3F8),
@@ -82,12 +84,15 @@ class HomePage extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 4),
-              ...notifier.plans.map((p) => _PlanListTile(
-                    plan: p,
-                    onTap: onNavigateToPlan != null
-                        ? () => onNavigateToPlan!(p.id)
-                        : null,
-                  )),
+              if (notifier.plans.isEmpty)
+                _EmptyPlanHint(onAddPlan: onAddPlan)
+              else
+                ...notifier.plans.map((p) => _PlanListTile(
+                      plan: p,
+                      onTap: onNavigateToPlan != null
+                          ? () => onNavigateToPlan!(p.id)
+                          : null,
+                    )),
               const SizedBox(height: 80),
             ],
           ),
@@ -264,7 +269,9 @@ class _WeeklyView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const weekdayLabels = ['월', '화', '수', '목', '금', '토', '일'];
+    const allLabels = ['월', '화', '수', '목', '금', '토', '일']; // index 0=월 … 6=일
+    final startIdx = (notifier.weekStartDay - 1) % 7;
+    final weekdayLabels = List.generate(7, (i) => allLabels[(startIdx + i) % 7]);
     final today = DateTime(now.year, now.month, now.day);
 
     return Column(
@@ -296,7 +303,7 @@ class _WeeklyView extends StatelessWidget {
             final isToday = date.year == today.year &&
                 date.month == today.month &&
                 date.day == today.day;
-            final isFuture = date.isAfter(today);
+            final isFuture = !isToday && date.isAfter(today);
 
             final plans = notifier.plansForDate(date);
             final hasPlans = plans.isNotEmpty;
@@ -311,16 +318,24 @@ class _WeeklyView extends StatelessWidget {
                 ? (_barColor(date, today) ?? kPrimary)
                 : _barColor(date, today);
 
-            final isOver = !isFuture && hasPlans &&
-                notifier.freeHoursForDate(date) > 0 &&
-                notifier.focusHoursForDate(date) > notifier.freeHoursForDate(date);
+            final freeH = notifier.freeHoursForDate(date);
+            final focusH = notifier.focusHoursForDate(date);
+            final isOver = !isFuture && freeH > 0 && focusH > freeH;
 
             final showCheck = !isFuture && hasPlans && (completionRate >= 1.0 || isOver);
 
-            final barHeight = (isFuture || !hasPlans)
+            double fillRate;
+            if (isFuture || !hasPlans) {
+              fillRate = 0;
+            } else if (freeH > 0) {
+              fillRate = (focusH / freeH).clamp(0.0, 1.0);
+            } else {
+              fillRate = completionRate.clamp(0.0, 1.0);
+            }
+
+            final barHeight = fillRate == 0
                 ? _minBarHeight
-                : (completionRate.clamp(0.0, 1.0) * _maxBarHeight)
-                    .clamp(_minBarHeight, _maxBarHeight);
+                : (fillRate * _maxBarHeight).clamp(_minBarHeight, _maxBarHeight);
 
             final barColor = color ?? const Color(0xFFE8EAF6);
 
@@ -377,6 +392,57 @@ class _WeeklyView extends StatelessWidget {
           }),
         ),
       ],
+    );
+  }
+}
+
+class _EmptyPlanHint extends StatelessWidget {
+  final VoidCallback? onAddPlan;
+  const _EmptyPlanHint({this.onAddPlan});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 32),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Icon(Icons.assignment_outlined, size: 48, color: Color(0xFFCCCCCC)),
+          const SizedBox(height: 12),
+          const Text(
+            '오늘의 계획이 없어요',
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A)),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            '계획을 추가하고 하루를 알차게 채워보세요!',
+            style: TextStyle(fontSize: 13, color: Color(0xFF888888)),
+          ),
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: onAddPlan,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                color: kPrimary,
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.add, color: Colors.white, size: 18),
+                  SizedBox(width: 6),
+                  Text('계획 추가하기', style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600)),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

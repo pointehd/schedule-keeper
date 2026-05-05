@@ -7,7 +7,8 @@ import 'widgets/plan_card.dart';
 
 class PlanPage extends StatefulWidget {
   final String? focusedPlanId;
-  const PlanPage({super.key, this.focusedPlanId});
+  final VoidCallback? onAddPlan;
+  const PlanPage({super.key, this.focusedPlanId, this.onAddPlan});
 
   @override
   State<PlanPage> createState() => _PlanPageState();
@@ -109,20 +110,72 @@ class _PlanPageState extends State<PlanPage> {
             ),
             const SizedBox(height: 12),
             Expanded(
-              child: ListView.builder(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: filtered.length,
-                itemBuilder: (context, i) {
-                  final plan = filtered[i];
-                  _itemKeys[plan.id] ??= GlobalKey();
-                  return Container(
-                    key: _itemKeys[plan.id],
-                    child: PlanCard(
-                      plan: plan,
-                      isFocused: plan.id == widget.focusedPlanId,
+              child: filtered.isEmpty
+                  ? _EmptyPlanHint(onAddPlan: widget.onAddPlan)
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: filtered.length,
+                      itemBuilder: (context, i) {
+                        final plan = filtered[i];
+                        _itemKeys[plan.id] ??= GlobalKey();
+                        return Container(
+                          key: _itemKeys[plan.id],
+                          child: PlanCard(
+                            plan: plan,
+                            isFocused: plan.id == widget.focusedPlanId,
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyPlanHint extends StatelessWidget {
+  final VoidCallback? onAddPlan;
+  const _EmptyPlanHint({this.onAddPlan});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.assignment_outlined, size: 64, color: Color(0xFFCCCCCC)),
+            const SizedBox(height: 16),
+            const Text(
+              '아직 계획이 없어요',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Color(0xFF1A1A1A)),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '새로운 계획을 추가해서\n오늘 하루를 알차게 만들어보세요!',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 14, color: Color(0xFF888888), height: 1.5),
+            ),
+            const SizedBox(height: 28),
+            GestureDetector(
+              onTap: onAddPlan,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                decoration: BoxDecoration(
+                  color: kPrimary,
+                  borderRadius: BorderRadius.circular(24),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.add, color: Colors.white, size: 20),
+                    SizedBox(width: 8),
+                    Text('계획 추가하기', style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w600)),
+                  ],
+                ),
               ),
             ),
           ],

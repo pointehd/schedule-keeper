@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/plan.dart';
+import '../../core/services/timer_notification_service.dart';
 
 const _kTimerId = 'timer_plan_id';
 const _kTimerStartMs = 'timer_start_ms';
@@ -10,10 +11,16 @@ const _kFreeHoursLegacy = 'free_hours';
 const _kFreeHoursInitKey = '19700101';
 const _kFirstOpenDate = 'first_open_date_ms';
 const _kUserName = 'user_name';
+const _kWeekStartDay = 'week_start_day';
 
 class PlanNotifier extends ChangeNotifier {
   PlanNotifier() {
     _init();
+    TimerNotificationService.init(onTimerPaused: _onNotificationPause);
+  }
+
+  void _onNotificationPause() {
+    if (_activeTimerId != null) pauseTimer(_activeTimerId!, fromNotification: true);
   }
 
   late final Box<PlanRecord> _planBox;
@@ -27,6 +34,7 @@ class PlanNotifier extends ChangeNotifier {
   DateTime? _timerStartedAt;
   Timer? _ticker;
   String? _userName;
+  int _weekStartDay = 1; // 1=월요일 … 7=일요일 (DateTime.weekday 인코딩)
 
   // ── helpers ───────────────────────────────────────────────
 
@@ -183,6 +191,15 @@ class PlanNotifier extends ChangeNotifier {
   bool get isLoggedIn => _userName != null;
   String? get userName => _userName;
 
+  int get weekStartDay => _weekStartDay;
+
+  void setWeekStartDay(int day) {
+    if (day < 1 || day > 7) return;
+    _weekStartDay = day;
+    _prefs?.setInt(_kWeekStartDay, day);
+    notifyListeners();
+  }
+
   void login(String name) {
     _userName = name.trim().isEmpty ? null : name.trim();
     _prefs?.setString(_kUserName, _userName ?? '');
@@ -217,10 +234,11 @@ class PlanNotifier extends ChangeNotifier {
     _timerStartedAt = DateTime.now();
     _saveTimerState();
     _startTicker();
+    _startNotification(id);
     notifyListeners();
   }
 
-  void pauseTimer(String id) {
+  void pauseTimer(String id, {bool fromNotification = false}) {
     if (_activeTimerId != id) return;
     _flushActiveTimer();
     _activeTimerId = null;
@@ -228,7 +246,20 @@ class PlanNotifier extends ChangeNotifier {
     _clearTimerState();
     _ticker?.cancel();
     _ticker = null;
+    if (!fromNotification) TimerNotificationService.stopTimer();
     notifyListeners();
+  }
+
+  void _startNotification(String id) {
+    final record = _planBox.get(id);
+    if (record == null) return;
+    final today = _dateOnly(DateTime.now());
+    final v = record.versionForDate(today);
+    if (v == null) return;
+    TimerNotificationService.startTimer(
+      planName: v.name,
+      elapsedMinutes: getLiveMinutes(id),
+    );
   }
 
   // ── plan mutations ────────────────────────────────────────
@@ -289,6 +320,7 @@ class PlanNotifier extends ChangeNotifier {
     if (_activeTimerId == id) pauseTimer(id);
     notifyListeners();
   }
+
 
   /// Removes the plan and all its progress records.
   void deletePlan(String id) {
@@ -500,6 +532,8 @@ class PlanNotifier extends ChangeNotifier {
 
     _fillMissingDays();
 
+    _weekStartDay = _prefs?.getInt(_kWeekStartDay) ?? 1;
+
     final savedName = _prefs?.getString(_kUserName);
     if (savedName != null && savedName.isNotEmpty) _userName = savedName;
 
@@ -512,6 +546,7 @@ class PlanNotifier extends ChangeNotifier {
       _timerStartedAt = DateTime.now();
       _saveTimerState();
       _startTicker();
+      _startNotification(id);
     }
 
     notifyListeners();

@@ -189,7 +189,9 @@ class _EditPlanPageState extends State<EditPlanPage> {
               ),
             ),
           ),
-          Container(
+          SafeArea(
+            top: false,
+            child: Container(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -219,6 +221,7 @@ class _EditPlanPageState extends State<EditPlanPage> {
                         TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
               ),
             ),
+          ),
           ),
         ],
       ),

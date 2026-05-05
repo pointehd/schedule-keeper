@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../shared/providers/plan_provider.dart';
-import '../shared/widgets/main_scaffold.dart';
+import '../features/splash/splash_screen.dart';
 
 class App extends StatelessWidget {
   const App({super.key});
@@ -11,7 +11,7 @@ class App extends StatelessWidget {
     return ChangeNotifierProvider(
       create: (_) => PlanNotifier(),
       child: MaterialApp(
-        title: '데일리 스케줄 키퍼',
+        title: 'Routine Calendar',
         debugShowCheckedModeBanner: false,
         theme: ThemeData(
           colorScheme: ColorScheme.fromSeed(
@@ -20,7 +20,7 @@ class App extends StatelessWidget {
           scaffoldBackgroundColor: const Color(0xFFF2F3F8),
           useMaterial3: true,
         ),
-        home: const MainScaffold(),
+        home: const SplashScreen(),
       ),
     );
   }
